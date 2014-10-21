@@ -16,6 +16,10 @@ typedef enum MOJOSHADER_renderStateType
 {
     /* Note that we are NOT using the actual RS values from D3D here.
      * For some reason, in the binary data, it's 0-based.
+     * Even worse, it doesn't even seem to be in order.
+     * Here is the list of changes compared to the real D3DRS enum:
+     * - All of the RS_WRAP values are in a row, not separate!
+     *
      * -flibit
      */
     MOJOSHADER_RS_ZENABLE,
@@ -57,6 +61,14 @@ typedef enum MOJOSHADER_renderStateType
     MOJOSHADER_RS_WRAP5,
     MOJOSHADER_RS_WRAP6,
     MOJOSHADER_RS_WRAP7,
+    MOJOSHADER_RS_WRAP8,
+    MOJOSHADER_RS_WRAP9,
+    MOJOSHADER_RS_WRAP10,
+    MOJOSHADER_RS_WRAP11,
+    MOJOSHADER_RS_WRAP12,
+    MOJOSHADER_RS_WRAP13,
+    MOJOSHADER_RS_WRAP14,
+    MOJOSHADER_RS_WRAP15,
     MOJOSHADER_RS_CLIPPING,
     MOJOSHADER_RS_LIGHTING,
     MOJOSHADER_RS_AMBIENT,
@@ -109,14 +121,6 @@ typedef enum MOJOSHADER_renderStateType
     MOJOSHADER_RS_BLENDFACTOR,
     MOJOSHADER_RS_SRGBWRITEENABLE,
     MOJOSHADER_RS_DEPTHBIAS,
-    MOJOSHADER_RS_WRAP8,
-    MOJOSHADER_RS_WRAP9,
-    MOJOSHADER_RS_WRAP10,
-    MOJOSHADER_RS_WRAP11,
-    MOJOSHADER_RS_WRAP12,
-    MOJOSHADER_RS_WRAP13,
-    MOJOSHADER_RS_WRAP14,
-    MOJOSHADER_RS_WRAP15,
     MOJOSHADER_RS_SEPARATEALPHABLENDENABLE,
     MOJOSHADER_RS_SRCBLENDALPHA,
     MOJOSHADER_RS_DESTBLENDALPHA,
