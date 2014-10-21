@@ -191,6 +191,7 @@ struct MOJOSHADER_glContext
     int have_GL_NV_half_float;
     int have_GL_ARB_half_float_vertex;
     int have_GL_OES_vertex_half_float;
+    int have_GL_ARB_instanced_arrays;
 
     // Entry points...
     PFNGLGETSTRINGPROC glGetString;
@@ -247,6 +248,7 @@ struct MOJOSHADER_glContext
     PFNGLGENPROGRAMSARBPROC glGenProgramsARB;
     PFNGLBINDPROGRAMARBPROC glBindProgramARB;
     PFNGLPROGRAMSTRINGARBPROC glProgramStringARB;
+    PFNGLVERTEXATTRIBDIVISORARBPROC glVertexAttribDivisorARB;
 
     // interface for profile-specific things.
     int (*profileMaxUniforms)(MOJOSHADER_shaderType shader_type);
@@ -982,6 +984,7 @@ static void lookup_entry_points(MOJOSHADER_glGetProcAddress lookup, void *d)
     DO_LOOKUP(GL_ARB_vertex_program, PFNGLBINDPROGRAMARBPROC, glBindProgramARB);
     DO_LOOKUP(GL_ARB_vertex_program, PFNGLPROGRAMSTRINGARBPROC, glProgramStringARB);
     DO_LOOKUP(GL_NV_gpu_program4, PFNGLPROGRAMLOCALPARAMETERI4IVNVPROC, glProgramLocalParameterI4ivNV);
+    DO_LOOKUP(GL_ARB_instanced_arrays, PFNGLVERTEXATTRIBDIVISORARBPROC, glVertexAttribDivisorARB);
 
     #undef DO_LOOKUP
 } // lookup_entry_points
@@ -1095,6 +1098,7 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
     ctx->have_GL_NV_half_float = 1;
     ctx->have_GL_ARB_half_float_vertex = 1;
     ctx->have_GL_OES_vertex_half_float = 1;
+    ctx->have_GL_ARB_instanced_arrays = 1;
 
     lookup_entry_points(lookup, d);
 
@@ -1187,6 +1191,7 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
     VERIFY_EXT(GL_NV_half_float, -1, -1);
     VERIFY_EXT(GL_ARB_half_float_vertex, 3, 0);
     VERIFY_EXT(GL_OES_vertex_half_float, -1, -1);
+    VERIFY_EXT(GL_ARB_instanced_arrays, 3, 3);
 
     #undef VERIFY_EXT
 
@@ -2321,6 +2326,42 @@ void MOJOSHADER_glSetVertexAttribute(MOJOSHADER_usage usage,
     if (ctx->max_attrs < (gl_index + 1))
         ctx->max_attrs = gl_index + 1;
 } // MOJOSHADER_glSetVertexAttribute
+
+
+// !!! FIXME: shouldn't (index) be unsigned?
+void MOJOSHADER_glSetVertexAttribDivisor(MOJOSHADER_usage usage,
+                                         int index, unsigned int divisor)
+{
+    assert(ctx->have_GL_ARB_instanced_arrays);
+
+    if ((ctx->bound_program == NULL) || (ctx->bound_program->vertex == NULL))
+        return;
+
+    const int count = ctx->bound_program->attribute_count;
+    GLint gl_index = 0;
+    int i;
+
+    for (i = 0; i < count; i++)
+    {
+        const AttributeMap *map = &ctx->bound_program->attributes[i];
+        const MOJOSHADER_attribute *a = map->attribute;
+
+        // !!! FIXME: is this array guaranteed to be sorted by usage?
+        // !!! FIXME:  if so, we can break if a->usage > usage.
+
+        if ((a->usage == usage) && (a->index == index))
+        {
+            gl_index = map->location;
+            break;
+        } // if
+    } // for
+
+    if (i == count)
+        return;  // nothing to do, this shader doesn't use this stream.
+
+    ctx->glVertexAttribDivisorARB(gl_index, divisor);
+
+} // MOJOSHADER_glSetVertexAttribDivisor
 
 
 void MOJOSHADER_glSetVertexPreshaderUniformF(unsigned int idx,

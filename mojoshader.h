@@ -3147,6 +3147,23 @@ void MOJOSHADER_glSetVertexAttribute(MOJOSHADER_usage usage,
                                      int normalized, unsigned int stride,
                                      const void *ptr);
 
+/* Modify the rate at which this vertex attribute advances during instanced
+ *  rendering.
+ *
+ * This should be called alongside glSetVertexAttribute, as this does not flag
+ *  the vertex array as being in use. This just calls glVertexAttribDivisorARB.
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ *  safe, you should probably only call this from the same thread that created
+ *  the GL context.
+ *
+ * This call requires a valid MOJOSHADER_glContext to have been made current,
+ *  or it will crash your program. See MOJOSHADER_glMakeContextCurrent().
+ *
+ * Vertex attributes are not shared between contexts.
+ */
+void MOJOSHADER_glSetVertexAttribDivisor(MOJOSHADER_usage usage,
+                                         int index, unsigned int divisor);
 
 
 
