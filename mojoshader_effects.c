@@ -431,7 +431,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                             readui32(&ptr, &len);  // !!! FIXME: don't know what this field does.
                             /*const uint32 offsetend = */ readui32(&ptr, &len);
                             const uint32 offsetstart = readui32(&ptr, &len);
-                            uint8 *valptr = ((uint8 *) base) + offsetstart;
+                            const uint8 *valptr = ((uint8 *) base) + offsetstart;
                             unsigned int vallen = 9999999; // !!! FIXME
 
                             state->type = (MOJOSHADER_renderStateType) type;
