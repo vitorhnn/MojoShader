@@ -259,6 +259,7 @@ typedef struct MOJOSHADER_effectState
     MOJOSHADER_renderStateType type;
     union
     {
+        unsigned int                   value; /* Raw value */
         MOJOSHADER_zBufferType         valueZBT;
         MOJOSHADER_fillMode            valueFiM;
         MOJOSHADER_shadeMode           valueSM;
