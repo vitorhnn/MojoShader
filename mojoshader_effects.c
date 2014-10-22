@@ -471,6 +471,7 @@ static void readpasses(const uint32 numpasses,
 
         pass->name = readstring(base, passnameoffset, m, d);
 
+        pass->annotation_count = numannos;
         readannotations(numannos, base, ptr, len, &pass->annotations, m, d);
 
         pass->state_count = numstates;
@@ -504,10 +505,10 @@ static void readtechniques(const uint32 numtechniques,
         const uint32 numannos = readui32(ptr, len);
         const uint32 numpasses = readui32(ptr, len);
 
+        technique->name = readstring(base, nameoffset, m, d);
+
         technique->annotation_count = numannos;
         readannotations(numannos, base, ptr, len, &technique->annotations, m, d);
-
-        technique->name = readstring(base, nameoffset, m, d);
 
         technique->pass_count = numpasses;
         readpasses(numpasses, base, ptr, len, &technique->passes, m, d);
