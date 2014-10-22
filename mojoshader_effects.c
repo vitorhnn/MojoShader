@@ -222,7 +222,7 @@ static char *readstring(const uint8 *base,
     return strptr;
 } // readstring
 
-static void readannotations(uint32 numannos,
+static void readannotations(const uint32 numannos,
                             const uint8 *base,
                             const uint8 **ptr,
                             uint32 *len,
@@ -235,8 +235,11 @@ static void readannotations(uint32 numannos,
     {
         return;
     } // if
+
     const uint32 siz = sizeof(MOJOSHADER_effectAnnotation) * numannos;
     *annotations = (MOJOSHADER_effectAnnotation *) m(siz, d);
+    memset(*annotations, '\0', siz);
+
     for (i = 0; i < numannos; i++)
     {
         MOJOSHADER_effectAnnotation *anno = &(*annotations)[i];
@@ -260,6 +263,216 @@ static void readannotations(uint32 numannos,
         /* TODO: Parse the annotation value -flibit */
     } // for
 } // readannotation
+
+static void readparameters(const uint32 numparams,
+                           const uint8 *base,
+                           const uint8 **ptr,
+                           uint32 *len,
+                           MOJOSHADER_effectParam **params,
+                           MOJOSHADER_malloc m,
+                           void *d)
+{
+    int i, j;
+    if (numparams == 0)
+    {
+        return;
+    } // if
+
+    uint32 siz = sizeof(MOJOSHADER_effectParam) * numparams;
+    *params = (MOJOSHADER_effectParam *) m(siz, d);
+    memset(*params, '\0', siz);
+
+    for (i = 0; i < numparams; i++)
+    {
+        MOJOSHADER_effectParam *param = &(*params)[i];
+
+        const uint32 typeoffset = readui32(ptr, len);
+        const uint32 valoffset = readui32(ptr, len);
+        /*const uint32 flags =*/ readui32(ptr, len);
+        const uint32 numannos = readui32(ptr, len);
+
+        param->annotation_count = numannos;
+        readannotations(numannos, base, ptr, len, &param->annotations, m, d);
+
+        const uint8 *typeptr = base + typeoffset;
+        unsigned int typelen = 9999999;  // !!! FIXME
+        const uint32 paramtype = readui32(&typeptr, &typelen);
+        const uint32 paramclass = readui32(&typeptr, &typelen);
+        const uint32 paramname = readui32(&typeptr, &typelen);
+        const uint32 paramsemantic = readui32(&typeptr, &typelen);
+
+        param->param_type = (MOJOSHADER_symbolType) paramtype;
+        param->param_class = (MOJOSHADER_symbolClass) paramclass;
+        param->name = readstring(base, paramname, m, d);
+        param->semantic = readstring(base, paramsemantic, m, d);
+
+        if (paramtype == MOJOSHADER_SYMTYPE_SAMPLER
+         || paramtype == MOJOSHADER_SYMTYPE_SAMPLER1D
+         || paramtype == MOJOSHADER_SYMTYPE_SAMPLER2D
+         || paramtype == MOJOSHADER_SYMTYPE_SAMPLER3D
+         || paramtype == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
+        {
+            const uint8 *valptr = base + valoffset;
+            unsigned int vallen = 9999999; // !!! FIXME
+            const uint32 numstates = readui32(&valptr, &vallen);
+
+            /*param->row_count = ???;*/
+            /*param->column_count = ???;*/
+            param->sampler_state_count = numstates;
+
+            siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
+            param->sampler_states = (MOJOSHADER_effectSamplerState *) m(siz, d);
+            memset(param->sampler_states, '\0', siz);
+
+            for (j = 0; j < numstates; j++)
+            {
+                MOJOSHADER_effectSamplerState *state = &param->sampler_states[j];
+                const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
+                readui32(&valptr, &vallen);
+                /*const uint32 offset =*/ readui32(&valptr, &vallen);
+                const uint32 offsetstart = readui32(&valptr, &vallen);
+
+                state->type = (MOJOSHADER_samplerStateType) type;
+                if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
+                {
+                    /* float types */
+                    state->valueF = *(float *) (base + offsetstart);
+                }
+                else
+                {
+                    /* int/enum types */
+                    state->valueI = *(unsigned int *) (base + offsetstart);
+                }
+            }
+        }
+        else if (paramtype == MOJOSHADER_SYMTYPE_BOOL
+              || paramtype == MOJOSHADER_SYMTYPE_INT
+              || paramtype == MOJOSHADER_SYMTYPE_FLOAT)
+        {
+            const uint32 numelements = readui32(&typeptr, &typelen);
+            const uint32 columncount = readui32(&typeptr, &typelen);
+            const uint32 rowcount = readui32(&typeptr, &typelen);
+
+            param->element_count = numelements;
+            param->column_count = columncount;
+            param->row_count = rowcount;
+            param->value_count = numelements * columncount * rowcount;
+
+            const uint32 typesize = (paramtype == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
+            siz = param->element_count * param->value_count * typesize;
+
+            param->values = m(siz, d);
+            memcpy(param->values, base + valoffset, siz);
+        }
+        else if (paramtype == MOJOSHADER_SYMTYPE_TEXTURE)
+        {
+            /* TODO: Default texture values...? -flibit */
+        }
+    } // for
+} // readparameters
+
+static void readstates(const uint32 numstates,
+                       const uint8 *base,
+                       const uint8 **ptr,
+                       uint32 *len,
+                       MOJOSHADER_effectState **states,
+                       MOJOSHADER_malloc m,
+                       void *d)
+{
+    int i;
+    if (numstates == 0)
+    {
+        return;
+    } // if
+
+    uint32 siz = sizeof (MOJOSHADER_effectState) * numstates;
+    *states = (MOJOSHADER_effectState *) m(siz, d);
+    memset(*states, '\0', siz);
+
+    for (i = 0; i < numstates; i++)
+    {
+        MOJOSHADER_effectState *state = &(*states)[i];
+
+        const uint32 type = readui32(ptr, len);
+        /*const uint32 FIXME =*/ readui32(ptr, len);
+        /*const uint32 offsetend =*/ readui32(ptr, len);
+        const uint32 offsetstart = readui32(ptr, len);
+
+        state->type = (MOJOSHADER_renderStateType) type;
+        state->value = *((uint32 *) (((uint8 *) base) + offsetstart));
+    } // for
+} // readstates
+
+static void readpasses(const uint32 numpasses,
+                       const uint8 *base,
+                       const uint8 **ptr,
+                       uint32 *len,
+                       MOJOSHADER_effectPass **passes,
+                       MOJOSHADER_malloc m,
+                       void *d)
+{
+    int i;
+    if (numpasses == 0)
+    {
+        return;
+    } // if
+
+    uint32 siz = sizeof (MOJOSHADER_effectPass) * numpasses;
+    *passes = (MOJOSHADER_effectPass *) m(siz, d);
+    memset(*passes, '\0', siz);
+
+    for (i = 0; i < numpasses; i++)
+    {
+        MOJOSHADER_effectPass *pass = &(*passes)[i];
+
+        const uint32 passnameoffset = readui32(ptr, len);
+        const uint32 numannos = readui32(ptr, len);
+        const uint32 numstates = readui32(ptr, len);
+
+        pass->name = readstring(base, passnameoffset, m, d);
+
+        readannotations(numannos, base, ptr, len, &pass->annotations, m, d);
+
+        pass->state_count = numstates;
+        readstates(numstates, base, ptr, len, &pass->states, m, d);
+    } // for
+} // readpasses
+
+static void readtechniques(const uint32 numtechniques,
+                           const uint8 *base,
+                           const uint8 **ptr,
+                           uint32 *len,
+                           MOJOSHADER_effectTechnique **techniques,
+                           MOJOSHADER_malloc m,
+                           void *d)
+{
+    int i;
+    if (numtechniques == 0)
+    {
+        return;
+    } // if
+
+    const uint32 siz = sizeof (MOJOSHADER_effectTechnique) * numtechniques;
+    *techniques = (MOJOSHADER_effectTechnique *) m(siz, d);
+    memset(*techniques, '\0', siz);
+
+    for (i = 0; i < numtechniques; i++)
+    {
+        MOJOSHADER_effectTechnique *technique = &(*techniques)[i];
+
+        const uint32 nameoffset = readui32(ptr, len);
+        const uint32 numannos = readui32(ptr, len);
+        const uint32 numpasses = readui32(ptr, len);
+
+        technique->annotation_count = numannos;
+        readannotations(numannos, base, ptr, len, &technique->annotations, m, d);
+
+        technique->name = readstring(base, nameoffset, m, d);
+
+        technique->pass_count = numpasses;
+        readpasses(numpasses, base, ptr, len, &technique->passes, m, d);
+    } // for
+} // readtechniques
 
 // !!! FIXME: this is sort of a big, ugly function.
 const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
@@ -297,231 +510,44 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
         goto parseEffect_unexpectedEOF;
 
     const uint8 *base = NULL;
-    if (readui32(&ptr, &len) != 0xFEFF0901) // !!! FIXME: is this always magic?
+    if (readui32(&ptr, &len) != 0xFEFF0901)
         goto parseEffect_notAnEffectsFile;
     else
     {
         const uint32 offset = readui32(&ptr, &len);
         base = ptr;
-//printf("base offset == %u\n", offset);
         if (offset > len)
             goto parseEffect_unexpectedEOF;
         ptr += offset;
         len -= offset;
     } // else
 
-    // params...
-
     if (len < 16)
         goto parseEffect_unexpectedEOF;
 
     const uint32 numparams = readui32(&ptr, &len);
     const uint32 numtechniques = readui32(&ptr, &len);
-
-    readui32(&ptr, &len); // !!! FIXME: there are 8 unknown bytes here. Annotations?
+    /*const uint32 FIXME = */ readui32(&ptr, &len);
     /*const uint32 numobjects = */ readui32(&ptr, &len);
 
-    if (numparams > 0)
-    {
-        siz = sizeof (MOJOSHADER_effectParam) * numparams;
-        retval->params = (MOJOSHADER_effectParam *) m(siz, d);
-        if (retval->params == NULL)
-            goto parseEffect_outOfMemory;
-        memset(retval->params, '\0', siz);
-
-        retval->param_count = numparams;
-
-        for (i = 0; i < numparams; i++)
-        {
-            if (len < 16)
-                goto parseEffect_unexpectedEOF;
-
-            MOJOSHADER_effectParam *param = &retval->params[i];
-
-            const uint32 typeoffset = readui32(&ptr, &len);
-            const uint32 valoffset = readui32(&ptr, &len);
-            /*const uint32 flags =*/ readui32(&ptr, &len);
-            const uint32 numannos = readui32(&ptr, &len);
-
-            param->annotation_count = numannos;
-            readannotations(numannos, base, &ptr, &len, &param->annotations, m, d);
-
-            const uint8 *typeptr = base + typeoffset;
-            unsigned int typelen = 9999999;  // !!! FIXME
-            const uint32 paramtype = readui32(&typeptr, &typelen);
-            const uint32 paramclass = readui32(&typeptr, &typelen);
-            const uint32 paramname = readui32(&typeptr, &typelen);
-            const uint32 paramsemantic = readui32(&typeptr, &typelen);
-
-            param->param_type = (MOJOSHADER_symbolType) paramtype;
-            param->param_class = (MOJOSHADER_symbolClass) paramclass;
-            param->name = readstring(base, paramname, m, d);
-            param->semantic = readstring(base, paramsemantic, m, d);
-
-            if (paramtype == MOJOSHADER_SYMTYPE_SAMPLER
-             || paramtype == MOJOSHADER_SYMTYPE_SAMPLER1D
-             || paramtype == MOJOSHADER_SYMTYPE_SAMPLER2D
-             || paramtype == MOJOSHADER_SYMTYPE_SAMPLER3D
-             || paramtype == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
-            {
-                const uint8 *valptr = base + valoffset;
-                unsigned int vallen = 9999999; // !!! FIXME
-                const uint32 numstates = readui32(&valptr, &vallen);
-
-                /*param->row_count = ???;*/
-                /*param->column_count = ???;*/
-                param->sampler_state_count = numstates;
-
-                siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
-                param->sampler_states = (MOJOSHADER_effectSamplerState *) m(siz, d);
-                if (param->sampler_states == NULL)
-                    goto parseEffect_outOfMemory;
-                memset(param->sampler_states, '\0', siz);
-
-                for (j = 0; j < numstates; j++)
-                {
-                    MOJOSHADER_effectSamplerState *state = &param->sampler_states[j];
-                    const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
-                    readui32(&valptr, &vallen);
-                    /*const uint32 offset =*/ readui32(&valptr, &vallen);
-                    const uint32 offsetstart = readui32(&valptr, &vallen);
-
-                    state->type = (MOJOSHADER_samplerStateType) type;
-                    if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
-                    {
-                        /* float types */
-                        state->valueF = *(float *) (base + offsetstart);
-                    }
-                    else
-                    {
-                        /* int/enum types */
-                        state->valueI = *(unsigned int *) (base + offsetstart);
-                    }
-                }
-            }
-            else if (paramtype == MOJOSHADER_SYMTYPE_BOOL
-                  || paramtype == MOJOSHADER_SYMTYPE_INT
-                  || paramtype == MOJOSHADER_SYMTYPE_FLOAT)
-            {
-                const uint32 numelements = readui32(&typeptr, &typelen);
-                const uint32 columncount = readui32(&typeptr, &typelen);
-                const uint32 rowcount = readui32(&typeptr, &typelen);
-
-                param->element_count = numelements;
-                param->column_count = columncount;
-                param->row_count = rowcount;
-                param->value_count = numelements * columncount * rowcount;
-
-                const uint32 typesize = (paramtype == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
-                siz = param->element_count * param->value_count * typesize;
-
-                param->values = m(siz, d);
-                if (param->values == NULL)
-                    goto parseEffect_outOfMemory;
-                memcpy(param->values, base + valoffset, siz);
-            }
-            else if (paramtype == MOJOSHADER_SYMTYPE_TEXTURE)
-            {
-                /* TODO: Default texture values...? -flibit */
-            }
-        } // for
-    } // if
-
-    uint32 numshaders = 0;  // we'll calculate this later.
+    // params...
+    retval->param_count = numparams;
+    readparameters(numparams, base, &ptr, &len, &retval->params, m, d);
 
     // techniques...
+    retval->technique_count = numtechniques;
+    readtechniques(numtechniques, base, &ptr, &len, &retval->techniques, m, d);
 
-    if (numtechniques > 0)
+    // calculate number of shaders from effect pass types...
+    uint32 numshaders = 0;
+    for (i = 0; i < numtechniques; i++)
+    for (j = 0; j < retval->techniques[i].pass_count; j++)
+    for (k = 0; k < retval->techniques[i].passes[j].state_count; k++)
+    if ((retval->techniques[i].passes[j].states[k].type == 0x92)
+     || (retval->techniques[i].passes[j].states[k].type == 0x93))
     {
-        siz = sizeof (MOJOSHADER_effectTechnique) * numtechniques;
-        retval->techniques = (MOJOSHADER_effectTechnique *) m(siz, d);
-        if (retval->techniques == NULL)
-            goto parseEffect_outOfMemory;
-        memset(retval->techniques, '\0', siz);
-
-        retval->technique_count = numtechniques;
-
-        for (i = 0; i < numtechniques; i++)
-        {
-            if (len < 12)
-                goto parseEffect_unexpectedEOF;
-            
-            MOJOSHADER_effectTechnique *technique = &retval->techniques[i];
-
-            const uint32 nameoffset = readui32(&ptr, &len);
-            const uint32 numannos = readui32(&ptr, &len);
-            const uint32 numpasses = readui32(&ptr, &len);
-
-            if (nameoffset >= _len)
-                goto parseEffect_unexpectedEOF;
-
-            technique->annotation_count = numannos;
-            readannotations(numannos, base, &ptr, &len, &technique->annotations, m, d);
-
-            technique->name = readstring(base, nameoffset, m, d);
-
-            if (numpasses > 0)
-            {
-                technique->pass_count = numpasses;
-
-                siz = sizeof (MOJOSHADER_effectPass) * numpasses;
-                technique->passes = (MOJOSHADER_effectPass *) m(siz, d);
-                if (technique->passes == NULL)
-                    goto parseEffect_outOfMemory;
-                memset(technique->passes, '\0', siz);
-
-                for (j = 0; j < numpasses; j++)
-                {
-                    if (len < 12)
-                        goto parseEffect_unexpectedEOF;
-
-                    MOJOSHADER_effectPass *pass = &technique->passes[j];
-
-                    const uint32 passnameoffset = readui32(&ptr, &len);
-                    const uint32 numannos = readui32(&ptr, &len);
-                    const uint32 numstates = readui32(&ptr, &len);
-
-                    if (passnameoffset >= _len)
-                        goto parseEffect_unexpectedEOF;
-
-                    pass->name = readstring(base, passnameoffset, m, d);
-
-                    readannotations(numannos, base, &ptr, &len, &pass->annotations, m, d);
-
-                    if (numstates > 0)
-                    {
-                        pass->state_count = numstates;
-
-                        siz = sizeof (MOJOSHADER_effectState) * numstates;
-                        pass->states = (MOJOSHADER_effectState *) m(siz, d);
-                        if (pass->states == NULL)
-                            goto parseEffect_outOfMemory;
-                        memset(pass->states, '\0', siz);
-
-                        for (k = 0; k < numstates; k++)
-                        {
-                            if (len < 16)
-                                goto parseEffect_unexpectedEOF;
-
-                            MOJOSHADER_effectState *state = &pass->states[k];
-                            const uint32 type = readui32(&ptr, &len);
-                            readui32(&ptr, &len);  // !!! FIXME: don't know what this field does.
-                            /*const uint32 offsetend = */ readui32(&ptr, &len);
-                            const uint32 offsetstart = readui32(&ptr, &len);
-                            const uint8 *valptr = ((uint8 *) base) + offsetstart;
-                            unsigned int vallen = 9999999; // !!! FIXME
-
-                            state->type = (MOJOSHADER_renderStateType) type;
-                            state->value = readui32(&valptr, &vallen);
-
-                            if ((type == 0x92) || (type == 0x93))
-                                numshaders++;
-                        } // for
-                    } // if
-                } // for
-            } // if
-        } // for
-    } // if
+        numshaders++;
+    }
 
     // textures...
 
