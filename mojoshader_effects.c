@@ -284,13 +284,44 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             /*const uint32 flags =*/ readui32(&ptr, &len);
             const uint32 numannos = readui32(&ptr, &len);
 
+            param->annotation_count = numannos;
+            siz = sizeof(MOJOSHADER_effectAnnotation) * numannos;
+            param->annotations = (MOJOSHADER_effectAnnotation*) m(siz, d);
             for (j = 0; j < numannos; j++)
             {
                 if (len < 8)
                     goto parseEffect_unexpectedEOF;
-                // !!! FIXME: parse annotations.
-                readui32(&ptr, &len);
-                readui32(&ptr, &len);
+                MOJOSHADER_effectAnnotation *anno = &param->annotations[j];
+
+                const uint32 annotypeoffset = readui32(&ptr, &len);
+                const uint32 annovaloffset = readui32(&ptr, &len);
+
+                const uint8 *typeptr = base + annotypeoffset;
+                unsigned int annolen = 9999999;  // !!! FIXME
+                const uint32 annotype = readui32(&typeptr, &annolen);
+                const uint32 annoclass = readui32(&typeptr, &annolen);
+                const uint32 annoname = readui32(&typeptr, &annolen);
+                const uint32 annosemantic = readui32(&typeptr, &annolen);
+
+                anno->anno_type = (MOJOSHADER_symbolType) annotype;
+                anno->anno_class = (MOJOSHADER_symbolClass) annoclass;
+
+                // !!! FIXME: sanity checks!
+                const char *namestr = ((const char *) base) + annoname;
+                const char *semstr = ((const char *) base) + annosemantic;
+                uint32 len;
+                char *strptr;
+                len = *((const uint32 *) namestr);
+                strptr = (char *) m(len, d);
+                memcpy(strptr, namestr + 4, len);
+                anno->name = strptr;
+                len = *((const uint32 *) semstr);
+                strptr = (char *) m(len, d);
+                memcpy(strptr, semstr + 4, len);
+                anno->semantic = strptr;
+
+                const uint8 *valptr = base + annovaloffset;
+                /* TODO: Parse the annotation value -flibit */
             } // for
 
             const uint8 *typeptr = base + typeoffset;
