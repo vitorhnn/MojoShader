@@ -8425,7 +8425,7 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
             {
                 case 1:  // literal from CLIT block.
                 {
-                    if (item >= preshader->literal_count)
+                    if ((item + inst->element_count) >= preshader->literal_count)
                     {
                         fail(ctx, "Bogus preshader literal index.");
                         break;
@@ -8443,7 +8443,7 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
                         const uint32 base = sym->register_index * 4;
                         const uint32 count = sym->register_count * 4;
                         assert(sym->register_set==MOJOSHADER_SYMREGSET_FLOAT4);
-                        if ( (base <= item) && ((base + count) > item) )
+                        if ( (base <= item) && ((base + count) >= (item + inst->element_count)) )
                             break;
                     } // for
                     if (i == ctabdata.symbol_count)
@@ -8462,7 +8462,7 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
                     {
                         const uint32 base = output_map[(i*2)] * 4;
                         const uint32 count = output_map[(i*2)+1] * 4;
-                        if ( (base <= item) && ((base + count) > item) )
+                        if ( (base <= item) && ((base + count) >= (item + inst->element_count)) )
                             break;
                     } // for
                     if (i == output_map_count)
@@ -8479,7 +8479,7 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
                 {
                     operand->type = MOJOSHADER_PRESHADEROPERAND_TEMP;
                     if (item >= preshader->temp_count)
-                        preshader->temp_count = item + 1;
+                        preshader->temp_count = item + inst->element_count;
                     break;
                 } // case
             } // switch
