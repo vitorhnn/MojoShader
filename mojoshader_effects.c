@@ -202,6 +202,26 @@ static uint32 readui32(const uint8 **_ptr, uint32 *_len)
     return retval;
 } // readui32
 
+static char *readstring(const uint8 *base,
+                        const uint32 offset,
+                        MOJOSHADER_malloc m,
+                        void *d)
+{
+    // !!! FIXME: sanity checks!
+    // !!! FIXME: verify this doesn't go past EOF looking for a null.
+    const char *str = ((const char *) base) + offset;
+    uint32 len = *((const uint32 *) str);
+    char *strptr = NULL;
+    if (len == 0)
+    {
+        /* No length? No string. */
+        return NULL;
+    }
+    strptr = (char *) m(len, d);
+    memcpy(strptr, str + 4, len);
+    return strptr;
+} // readstring
+
 // !!! FIXME: this is sort of a big, ugly function.
 const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                                                 const unsigned char *buf,
@@ -305,20 +325,8 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
                 anno->anno_type = (MOJOSHADER_symbolType) annotype;
                 anno->anno_class = (MOJOSHADER_symbolClass) annoclass;
-
-                // !!! FIXME: sanity checks!
-                const char *namestr = ((const char *) base) + annoname;
-                const char *semstr = ((const char *) base) + annosemantic;
-                uint32 len;
-                char *strptr;
-                len = *((const uint32 *) namestr);
-                strptr = (char *) m(len, d);
-                memcpy(strptr, namestr + 4, len);
-                anno->name = strptr;
-                len = *((const uint32 *) semstr);
-                strptr = (char *) m(len, d);
-                memcpy(strptr, semstr + 4, len);
-                anno->semantic = strptr;
+                anno->name = readstring(base, annoname, m, d);
+                anno->semantic = readstring(base, annosemantic, m, d);
 
                 const uint8 *valptr = base + annovaloffset;
                 /* TODO: Parse the annotation value -flibit */
@@ -333,6 +341,9 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
             param->param_type = (MOJOSHADER_symbolType) paramtype;
             param->param_class = (MOJOSHADER_symbolClass) paramclass;
+            param->name = readstring(base, paramname, m, d);
+            param->semantic = readstring(base, paramsemantic, m, d);
+
             if (paramtype == MOJOSHADER_SYMTYPE_SAMPLER
              || paramtype == MOJOSHADER_SYMTYPE_SAMPLER1D
              || paramtype == MOJOSHADER_SYMTYPE_SAMPLER2D
@@ -399,22 +410,6 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             {
                 /* TODO: Default texture values...? -flibit */
             }
-
-            // !!! FIXME: sanity checks!
-            const char *namestr = ((const char *) base) + paramname;
-            const char *semstr = ((const char *) base) + paramsemantic;
-            uint32 len;
-            char *strptr;
-            len = *((const uint32 *) namestr);
-            strptr = (char *) m(len + 1, d);
-            memcpy(strptr, namestr + 4, len);
-            strptr[len] = '\0';
-            param->name = strptr;
-            len = *((const uint32 *) semstr);
-            strptr = (char *) m(len + 1, d);
-            memcpy(strptr, semstr + 4, len);
-            strptr[len] = '\0';
-            param->semantic = strptr;
         } // for
     } // if
 
@@ -458,15 +453,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                 } // for
             } // if
 
-            // !!! FIXME: verify this doesn't go past EOF looking for a null.
-            {
-                const char *namestr = ((char *) base) + nameoffset;
-                uint32 len = *((const uint32 *) namestr);
-                char *strptr = (char *) m(len + 1, d);
-                memcpy(strptr, namestr + 4, len);
-                strptr[len] = '\0';
-                technique->name = strptr;
-            }
+            technique->name = readstring(base, nameoffset, m, d);
 
             if (numpasses > 0)
             {
@@ -492,15 +479,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                     if (passnameoffset >= _len)
                         goto parseEffect_unexpectedEOF;
 
-                    // !!! FIXME: verify this doesn't go past EOF looking for a null.
-                    {
-                        const char *namestr = ((char *) base) + passnameoffset;
-                        uint32 len = *((const uint32 *) namestr);
-                        char *strptr = (char *) m(len + 1, d);
-                        memcpy(strptr, namestr + 4, len);
-                        strptr[len] = '\0';
-                        pass->name = strptr;
-                    }
+                    pass->name = readstring(base, passnameoffset, m, d);
 
                     if (numannos > 0)
                     {
