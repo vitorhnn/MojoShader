@@ -229,6 +229,8 @@ static void readvalue(const uint8 *base,
                       MOJOSHADER_symbolClass *val_class,
                       const char **val_name,
                       const char **val_semantic,
+                      uint32 *val_count,
+                      void **val_values,
                       MOJOSHADER_malloc m,
                       void *d)
 {
@@ -338,6 +340,7 @@ static void readannotations(const uint32 numannos,
         readvalue(base, typeoffset, valoffset,
                   &anno->anno_type, &anno->anno_class,
                   &anno->name, &anno->semantic,
+                  &anno->value_count, &anno->values,
                   m, d);
     } // for
 } // readannotation
@@ -375,6 +378,7 @@ static void readparameters(const uint32 numparams,
         readvalue(base, typeoffset, valoffset,
                   &param->param_type, &param->param_class,
                   &param->name, &param->semantic,
+                  &param->value_count, &param->values,
                   m, d);
 
     } // for
