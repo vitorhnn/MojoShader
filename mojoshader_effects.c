@@ -210,7 +210,7 @@ static char *readstring(const uint8 *base,
     // !!! FIXME: sanity checks!
     // !!! FIXME: verify this doesn't go past EOF looking for a null.
     const char *str = ((const char *) base) + offset;
-    uint32 len = *((const uint32 *) str);
+    const uint32 len = *((const uint32 *) str);
     char *strptr = NULL;
     if (len == 0)
     {
@@ -385,7 +385,7 @@ static void readstates(const uint32 numstates,
         return;
     } // if
 
-    uint32 siz = sizeof (MOJOSHADER_effectState) * numstates;
+    const uint32 siz = sizeof (MOJOSHADER_effectState) * numstates;
     *states = (MOJOSHADER_effectState *) m(siz, d);
     memset(*states, '\0', siz);
 
@@ -417,7 +417,7 @@ static void readpasses(const uint32 numpasses,
         return;
     } // if
 
-    uint32 siz = sizeof (MOJOSHADER_effectPass) * numpasses;
+    const uint32 siz = sizeof (MOJOSHADER_effectPass) * numpasses;
     *passes = (MOJOSHADER_effectPass *) m(siz, d);
     memset(*passes, '\0', siz);
 
