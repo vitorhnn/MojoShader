@@ -335,6 +335,7 @@ typedef struct MOJOSHADER_effectAnnotation
 {
     const char *name;
     const char *semantic;
+    unsigned int element_count;
     unsigned int row_count;
     unsigned int column_count;
     MOJOSHADER_symbolClass anno_class;
@@ -348,6 +349,7 @@ struct MOJOSHADER_effectParam
 {
     const char *name;
     const char *semantic;
+    unsigned int element_count;
     unsigned int row_count;
     unsigned int column_count;
     MOJOSHADER_symbolClass param_class;

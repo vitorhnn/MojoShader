@@ -229,87 +229,112 @@ static void readvalue(const uint8 *base,
                       MOJOSHADER_symbolClass *val_class,
                       const char **val_name,
                       const char **val_semantic,
-                      uint32 *val_count,
+                      uint32 *val_element_count,
+                      uint32 *val_row_count,
+                      uint32 *val_column_count,
+                      uint32 *val_value_count,
                       void **val_values,
                       MOJOSHADER_malloc m,
                       void *d)
 {
+    int i;
     const uint8 *typeptr = base + typeoffset;
     unsigned int typelen = 9999999;  // !!! FIXME
     const uint32 type = readui32(&typeptr, &typelen);
     const uint32 class = readui32(&typeptr, &typelen);
     const uint32 name = readui32(&typeptr, &typelen);
     const uint32 semantic = readui32(&typeptr, &typelen);
+    const uint32 numelements = readui32(&typeptr, &typelen);
 
     *val_type = (MOJOSHADER_symbolType) type;
     *val_class = (MOJOSHADER_symbolClass) class;
     *val_name = readstring(base, name, m, d);
     *val_semantic = readstring(base, semantic, m, d);
 
-#if 0 // FIXME: Ah, crap... -flibit
-    if (type == MOJOSHADER_SYMTYPE_SAMPLER
-     || type == MOJOSHADER_SYMTYPE_SAMPLER1D
-     || type == MOJOSHADER_SYMTYPE_SAMPLER2D
-     || type == MOJOSHADER_SYMTYPE_SAMPLER3D
-     || type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
+    if (class == MOJOSHADER_SYMCLASS_SCALAR
+     || class == MOJOSHADER_SYMCLASS_VECTOR
+     || class == MOJOSHADER_SYMCLASS_MATRIX_ROWS
+     || class == MOJOSHADER_SYMCLASS_MATRIX_COLUMNS)
     {
-        const uint8 *valptr = base + valoffset;
-        unsigned int vallen = 9999999; // !!! FIXME
-        const uint32 numstates = readui32(&valptr, &vallen);
-
-        /*param->row_count = ???;*/
-        /*param->column_count = ???;*/
-        param->sampler_state_count = numstates;
-
-        siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
-        param->sampler_states = (MOJOSHADER_effectSamplerState *) m(siz, d);
-        memset(param->sampler_states, '\0', siz);
-
-        for (j = 0; j < numstates; j++)
-        {
-            MOJOSHADER_effectSamplerState *state = &param->sampler_states[j];
-            const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
-            readui32(&valptr, &vallen);
-            /*const uint32 offset =*/ readui32(&valptr, &vallen);
-            const uint32 offsetstart = readui32(&valptr, &vallen);
-
-            state->type = (MOJOSHADER_samplerStateType) type;
-            if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
-            {
-                /* float types */
-                state->valueF = *(float *) (base + offsetstart);
-            }
-            else
-            {
-                /* int/enum types */
-                state->valueI = *(unsigned int *) (base + offsetstart);
-            }
-        }
-    }
-    else if (paramtype == MOJOSHADER_SYMTYPE_BOOL
-          || paramtype == MOJOSHADER_SYMTYPE_INT
-          || paramtype == MOJOSHADER_SYMTYPE_FLOAT)
-    {
-        const uint32 numelements = readui32(&typeptr, &typelen);
         const uint32 columncount = readui32(&typeptr, &typelen);
         const uint32 rowcount = readui32(&typeptr, &typelen);
 
-        param->element_count = numelements;
-        param->column_count = columncount;
-        param->row_count = rowcount;
-        param->value_count = numelements * columncount * rowcount;
+        *val_column_count = columncount;
+        *val_row_count = rowcount;
+        *val_element_count = numelements;
 
-        const uint32 typesize = (paramtype == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
-        siz = param->element_count * param->value_count * typesize;
-
-        param->values = m(siz, d);
-        memcpy(param->values, base + valoffset, siz);
+        if (type == MOJOSHADER_SYMTYPE_BOOL
+         || type == MOJOSHADER_SYMTYPE_INT
+         || type == MOJOSHADER_SYMTYPE_FLOAT)
+        {
+            uint32 siz = columncount * rowcount;
+            if (numelements > 0)
+            {
+                siz *= numelements;
+            }
+            *val_value_count = siz;
+            siz *= (type == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
+            *val_values = m(siz, d);
+            memcpy(*val_values, base + valoffset, siz);
+        }
+        else
+        {
+            /* TODO: -flibit */
+        }
     }
-    else if (paramtype == MOJOSHADER_SYMTYPE_TEXTURE)
+    else if (class == MOJOSHADER_SYMCLASS_OBJECT)
     {
-        /* TODO: Default texture values...? -flibit */
+        if (type == MOJOSHADER_SYMTYPE_SAMPLER
+         || type == MOJOSHADER_SYMTYPE_SAMPLER1D
+         || type == MOJOSHADER_SYMTYPE_SAMPLER2D
+         || type == MOJOSHADER_SYMTYPE_SAMPLER3D
+         || type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
+        {
+            const uint8 *valptr = base + valoffset;
+            unsigned int vallen = 9999999; // !!! FIXME
+            const uint32 numstates = readui32(&valptr, &vallen);
+
+            *val_value_count = numstates;
+
+            const uint32 siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
+            *val_values = (MOJOSHADER_effectSamplerState *) m(siz, d);
+            memset(*val_values, '\0', siz);
+
+            MOJOSHADER_effectSamplerState *states = (MOJOSHADER_effectSamplerState *) *val_values;
+            for (i = 0; i < numstates; i++)
+            {
+                MOJOSHADER_effectSamplerState *state = &states[i];
+                const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
+                /*const uint32 FIXME =*/ readui32(&valptr, &vallen);
+                /*const uint32 offset =*/ readui32(&valptr, &vallen);
+                const uint32 offsetstart = readui32(&valptr, &vallen);
+
+                state->type = (MOJOSHADER_samplerStateType) type;
+                if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
+                {
+                    /* float types */
+                    state->valueF = *(float *) (base + offsetstart);
+                }
+                else
+                {
+                    /* int/enum types */
+                    state->valueI = *(unsigned int *) (base + offsetstart);
+                }
+            }
+        }
+        else if (type == MOJOSHADER_SYMTYPE_TEXTURE)
+        {
+            /* TODO: Default texture values...? -flibit */
+        }
+        else
+        {
+            /* TODO -flibit */
+        }
     }
-#endif
+    else if (class == MOJOSHADER_SYMCLASS_STRUCT)
+    {
+        /* TODO: -flibit */
+    }
 }
 
 static void readannotations(const uint32 numannos,
@@ -340,6 +365,7 @@ static void readannotations(const uint32 numannos,
         readvalue(base, typeoffset, valoffset,
                   &anno->anno_type, &anno->anno_class,
                   &anno->name, &anno->semantic,
+                  &anno->element_count, &anno->row_count, &anno->column_count,
                   &anno->value_count, &anno->values,
                   m, d);
     } // for
@@ -378,6 +404,7 @@ static void readparameters(const uint32 numparams,
         readvalue(base, typeoffset, valoffset,
                   &param->param_type, &param->param_class,
                   &param->name, &param->semantic,
+                  &param->element_count, &param->row_count, &param->column_count,
                   &param->value_count, &param->values,
                   m, d);
 
