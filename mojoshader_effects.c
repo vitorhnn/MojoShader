@@ -347,16 +347,17 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                   || paramtype == MOJOSHADER_SYMTYPE_INT
                   || paramtype == MOJOSHADER_SYMTYPE_FLOAT)
             {
-                readui32(&typeptr, &typelen);
+                const uint32 numelements = readui32(&typeptr, &typelen);
                 const uint32 columncount = readui32(&typeptr, &typelen);
                 const uint32 rowcount = readui32(&typeptr, &typelen);
 
+                param->element_count = numelements;
                 param->column_count = columncount;
                 param->row_count = rowcount;
-                param->value_count = columncount * rowcount;
+                param->value_count = numelements * columncount * rowcount;
 
                 const uint32 typesize = (paramtype == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
-                siz = param->value_count * typesize;
+                siz = param->element_count * param->value_count * typesize;
 
                 param->values = m(siz, d);
                 if (param->values == NULL)

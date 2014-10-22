@@ -350,6 +350,8 @@ struct MOJOSHADER_effectParam
     unsigned int column_count;
     MOJOSHADER_symbolClass param_class;
     MOJOSHADER_symbolType param_type;
+    unsigned int annotation_count;
+    MOJOSHADER_effectAnnotation* annotations;
     union
     {
         unsigned int element_count;
@@ -360,8 +362,6 @@ struct MOJOSHADER_effectParam
         MOJOSHADER_effectParam *elements;
         MOJOSHADER_effectParam *members;
     };
-    unsigned int annotation_count;
-    MOJOSHADER_effectAnnotation* annotations;
     union
     {
         unsigned int sampler_state_count;
