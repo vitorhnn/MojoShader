@@ -216,11 +216,50 @@ static char *readstring(const uint8 *base,
     {
         /* No length? No string. */
         return NULL;
-    }
+    } // if
     strptr = (char *) m(len, d);
     memcpy(strptr, str + 4, len);
     return strptr;
 } // readstring
+
+static void readannotations(uint32 numannos,
+                            const uint8 *base,
+                            const uint8 **ptr,
+                            uint32 *len,
+                            MOJOSHADER_effectAnnotation **annotations,
+                            MOJOSHADER_malloc m,
+                            void *d)
+{
+    int i;
+    if (numannos == 0)
+    {
+        return;
+    } // if
+    const uint32 siz = sizeof(MOJOSHADER_effectAnnotation) * numannos;
+    *annotations = (MOJOSHADER_effectAnnotation *) m(siz, d);
+    for (i = 0; i < numannos; i++)
+    {
+        MOJOSHADER_effectAnnotation *anno = &(*annotations)[i];
+
+        const uint32 annotypeoffset = readui32(ptr, len);
+        const uint32 annovaloffset = readui32(ptr, len);
+
+        const uint8 *typeptr = base + annotypeoffset;
+        unsigned int annolen = 9999999;  // !!! FIXME
+        const uint32 annotype = readui32(&typeptr, &annolen);
+        const uint32 annoclass = readui32(&typeptr, &annolen);
+        const uint32 annoname = readui32(&typeptr, &annolen);
+        const uint32 annosemantic = readui32(&typeptr, &annolen);
+
+        anno->anno_type = (MOJOSHADER_symbolType) annotype;
+        anno->anno_class = (MOJOSHADER_symbolClass) annoclass;
+        anno->name = readstring(base, annoname, m, d);
+        anno->semantic = readstring(base, annosemantic, m, d);
+
+        const uint8 *valptr = base + annovaloffset;
+        /* TODO: Parse the annotation value -flibit */
+    } // for
+} // readannotation
 
 // !!! FIXME: this is sort of a big, ugly function.
 const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
@@ -305,32 +344,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             const uint32 numannos = readui32(&ptr, &len);
 
             param->annotation_count = numannos;
-            siz = sizeof(MOJOSHADER_effectAnnotation) * numannos;
-            param->annotations = (MOJOSHADER_effectAnnotation*) m(siz, d);
-            for (j = 0; j < numannos; j++)
-            {
-                if (len < 8)
-                    goto parseEffect_unexpectedEOF;
-                MOJOSHADER_effectAnnotation *anno = &param->annotations[j];
-
-                const uint32 annotypeoffset = readui32(&ptr, &len);
-                const uint32 annovaloffset = readui32(&ptr, &len);
-
-                const uint8 *typeptr = base + annotypeoffset;
-                unsigned int annolen = 9999999;  // !!! FIXME
-                const uint32 annotype = readui32(&typeptr, &annolen);
-                const uint32 annoclass = readui32(&typeptr, &annolen);
-                const uint32 annoname = readui32(&typeptr, &annolen);
-                const uint32 annosemantic = readui32(&typeptr, &annolen);
-
-                anno->anno_type = (MOJOSHADER_symbolType) annotype;
-                anno->anno_class = (MOJOSHADER_symbolClass) annoclass;
-                anno->name = readstring(base, annoname, m, d);
-                anno->semantic = readstring(base, annosemantic, m, d);
-
-                const uint8 *valptr = base + annovaloffset;
-                /* TODO: Parse the annotation value -flibit */
-            } // for
+            readannotations(numannos, base, &ptr, &len, &param->annotations, m, d);
 
             const uint8 *typeptr = base + typeoffset;
             unsigned int typelen = 9999999;  // !!! FIXME
@@ -441,17 +455,8 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             if (nameoffset >= _len)
                 goto parseEffect_unexpectedEOF;
 
-            if (numannos > 0)
-            {
-                // !!! FIXME: expose these to the caller?
-                for (j = 0; j < numannos; j++)
-                {
-                    if (len < 8)
-                        goto parseEffect_unexpectedEOF;
-                    readui32(&ptr, &len);  // typedef offset
-                    readui32(&ptr, &len);  // value offset
-                } // for
-            } // if
+            technique->annotation_count = numannos;
+            readannotations(numannos, base, &ptr, &len, &technique->annotations, m, d);
 
             technique->name = readstring(base, nameoffset, m, d);
 
@@ -481,17 +486,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
                     pass->name = readstring(base, passnameoffset, m, d);
 
-                    if (numannos > 0)
-                    {
-                        for (k = 0; k < numannos; k++)
-                        {
-                            if (len < 8)
-                                goto parseEffect_unexpectedEOF;
-                            // !!! FIXME: do something with this.
-                            readui32(&ptr, &len);
-                            readui32(&ptr, &len);
-                        } // for
-                    } // if
+                    readannotations(numannos, base, &ptr, &len, &pass->annotations, m, d);
 
                     if (numstates > 0)
                     {
