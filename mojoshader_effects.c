@@ -296,23 +296,31 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             const uint8 *typeptr = base + typeoffset;
             unsigned int typelen = 9999999;  // !!! FIXME
             const uint32 paramtype = readui32(&typeptr, &typelen);
-            /*const uint32 paramclass =*/ readui32(&typeptr, &typelen);
+            const uint32 paramclass = readui32(&typeptr, &typelen);
             const uint32 paramname = readui32(&typeptr, &typelen);
             const uint32 paramsemantic = readui32(&typeptr, &typelen);
 
-            if (paramtype == MOJOSHADER_SYMTYPE_SAMPLER)
+            param->param_type = (MOJOSHADER_symbolType) paramtype;
+            param->param_class = (MOJOSHADER_symbolClass) paramclass;
+            if (paramtype == MOJOSHADER_SYMTYPE_SAMPLER
+             || paramtype == MOJOSHADER_SYMTYPE_SAMPLER1D
+             || paramtype == MOJOSHADER_SYMTYPE_SAMPLER2D
+             || paramtype == MOJOSHADER_SYMTYPE_SAMPLER3D
+             || paramtype == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
             {
                 const uint8 *valptr = base + valoffset;
                 unsigned int vallen = 9999999; // !!! FIXME
                 const uint32 numstates = readui32(&valptr, &vallen);
+
+                /*param->row_count = ???;*/
+                /*param->column_count = ???;*/
+                param->sampler_state_count = numstates;
 
                 siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
                 param->sampler_states = (MOJOSHADER_effectSamplerState *) m(siz, d);
                 if (param->sampler_states == NULL)
                     goto parseEffect_outOfMemory;
                 memset(param->sampler_states, '\0', siz);
-
-                param->sampler_state_count = numstates;
 
                 for (j = 0; j < numstates; j++)
                 {
@@ -323,26 +331,14 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                     const uint32 offsetstart = readui32(&valptr, &vallen);
 
                     state->type = (MOJOSHADER_samplerStateType) type;
-                    if (state->type == MOJOSHADER_SAMP_ADDRESSU
-                        || state->type == MOJOSHADER_SAMP_ADDRESSV
-                        || state->type == MOJOSHADER_SAMP_ADDRESSW)
-                    {
-                        state->valueF = *(MOJOSHADER_textureAddress *) (base + offsetstart);
-                    }
-                    else if (state->type == MOJOSHADER_SAMP_MAGFILTER
-                          || state->type == MOJOSHADER_SAMP_MINFILTER
-                          || state->type == MOJOSHADER_SAMP_MIPFILTER)
-                    {
-                        state->valueF = *(MOJOSHADER_textureFilterType *) (base + offsetstart);
-                    }
-                    else if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
+                    if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
                     {
                         /* float types */
                         state->valueF = *(float *) (base + offsetstart);
                     }
                     else
                     {
-                        /* int types */
+                        /* int/enum types */
                         state->valueI = *(unsigned int *) (base + offsetstart);
                     }
                 }
@@ -355,6 +351,8 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                 const uint32 columncount = readui32(&typeptr, &typelen);
                 const uint32 rowcount = readui32(&typeptr, &typelen);
 
+                param->column_count = columncount;
+                param->row_count = rowcount;
                 param->value_count = columncount * rowcount;
 
                 const uint32 typesize = (paramtype == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
@@ -364,6 +362,10 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                 if (param->values == NULL)
                     goto parseEffect_outOfMemory;
                 memcpy(param->values, base + valoffset, siz);
+            }
+            else if (paramtype == MOJOSHADER_SYMTYPE_TEXTURE)
+            {
+                /* TODO: Default texture values...? -flibit */
             }
 
             // !!! FIXME: sanity checks!
