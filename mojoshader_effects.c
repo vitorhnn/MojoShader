@@ -277,10 +277,13 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             if (len < 16)
                 goto parseEffect_unexpectedEOF;
 
+            MOJOSHADER_effectParam *param = &retval->params[i];
+
             const uint32 typeoffset = readui32(&ptr, &len);
-            /*const uint32 valoffset =*/ readui32(&ptr, &len);
+            const uint32 valoffset = readui32(&ptr, &len);
             /*const uint32 flags =*/ readui32(&ptr, &len);
             const uint32 numannos = readui32(&ptr, &len);
+
             for (j = 0; j < numannos; j++)
             {
                 if (len < 8)
@@ -292,10 +295,76 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
             const uint8 *typeptr = base + typeoffset;
             unsigned int typelen = 9999999;  // !!! FIXME
-            /*const uint32 paramtype =*/ readui32(&typeptr, &typelen);
+            const uint32 paramtype = readui32(&typeptr, &typelen);
             /*const uint32 paramclass =*/ readui32(&typeptr, &typelen);
             const uint32 paramname = readui32(&typeptr, &typelen);
             const uint32 paramsemantic = readui32(&typeptr, &typelen);
+
+            if (paramtype == MOJOSHADER_SYMTYPE_SAMPLER)
+            {
+                const uint8 *valptr = base + valoffset;
+                unsigned int vallen = 9999999; // !!! FIXME
+                const uint32 numstates = readui32(&valptr, &vallen);
+
+                siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
+                param->sampler_states = (MOJOSHADER_effectSamplerState *) m(siz, d);
+                if (param->sampler_states == NULL)
+                    goto parseEffect_outOfMemory;
+                memset(param->sampler_states, '\0', siz);
+
+                param->sampler_state_count = numstates;
+
+                for (j = 0; j < numstates; j++)
+                {
+                    MOJOSHADER_effectSamplerState *state = &param->sampler_states[j];
+                    const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
+                    readui32(&valptr, &vallen);
+                    /*const uint32 offset =*/ readui32(&valptr, &vallen);
+                    const uint32 offsetstart = readui32(&valptr, &vallen);
+
+                    state->type = (MOJOSHADER_samplerStateType) type;
+                    if (state->type == MOJOSHADER_SAMP_ADDRESSU
+                        || state->type == MOJOSHADER_SAMP_ADDRESSV
+                        || state->type == MOJOSHADER_SAMP_ADDRESSW)
+                    {
+                        state->valueF = *(MOJOSHADER_textureAddress *) (base + offsetstart);
+                    }
+                    else if (state->type == MOJOSHADER_SAMP_MAGFILTER
+                          || state->type == MOJOSHADER_SAMP_MINFILTER
+                          || state->type == MOJOSHADER_SAMP_MIPFILTER)
+                    {
+                        state->valueF = *(MOJOSHADER_textureFilterType *) (base + offsetstart);
+                    }
+                    else if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
+                    {
+                        /* float types */
+                        state->valueF = *(float *) (base + offsetstart);
+                    }
+                    else
+                    {
+                        /* int types */
+                        state->valueI = *(unsigned int *) (base + offsetstart);
+                    }
+                }
+            }
+            else if (paramtype == MOJOSHADER_SYMTYPE_BOOL
+                  || paramtype == MOJOSHADER_SYMTYPE_INT
+                  || paramtype == MOJOSHADER_SYMTYPE_FLOAT)
+            {
+                readui32(&typeptr, &typelen);
+                const uint32 columncount = readui32(&typeptr, &typelen);
+                const uint32 rowcount = readui32(&typeptr, &typelen);
+
+                param->value_count = columncount * rowcount;
+
+                const uint32 typesize = (paramtype == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
+                siz = param->value_count * typesize;
+
+                param->values = m(siz, d);
+                if (param->values == NULL)
+                    goto parseEffect_outOfMemory;
+                memcpy(param->values, base + valoffset, siz);
+            }
 
             // !!! FIXME: sanity checks!
             const char *namestr = ((const char *) base) + paramname;
@@ -306,12 +375,12 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
             strptr = (char *) m(len + 1, d);
             memcpy(strptr, namestr + 4, len);
             strptr[len] = '\0';
-            retval->params[i].name = strptr;
+            param->name = strptr;
             len = *((const uint32 *) semstr);
             strptr = (char *) m(len + 1, d);
             memcpy(strptr, semstr + 4, len);
             strptr[len] = '\0';
-            retval->params[i].semantic = strptr;
+            param->semantic = strptr;
         } // for
     } // if
 
@@ -623,6 +692,8 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     {
         f((void *) effect->params[i].name, d);
         f((void *) effect->params[i].semantic, d);
+        if (effect->params[i].sampler_states != NULL)
+            f((void *) effect->params[i].sampler_states, d);
     } // for
     f(effect->params, d);
 

@@ -364,7 +364,7 @@ struct MOJOSHADER_effectParam
     };
     union
     {
-        MOJOSHADER_effectSamplerState sampler_states;
+        MOJOSHADER_effectSamplerState *sampler_states;
         void *values;
     };
 };
