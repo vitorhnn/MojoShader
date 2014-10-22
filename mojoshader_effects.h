@@ -339,6 +339,8 @@ typedef struct MOJOSHADER_effectAnnotation
     unsigned int column_count;
     MOJOSHADER_symbolClass anno_class;
     MOJOSHADER_symbolType anno_type;
+    unsigned int value_count;
+    void *values;
 } MOJOSHADER_effectAnnotation;
 
 typedef struct MOJOSHADER_effectParam MOJOSHADER_effectParam;
@@ -350,28 +352,10 @@ struct MOJOSHADER_effectParam
     unsigned int column_count;
     MOJOSHADER_symbolClass param_class;
     MOJOSHADER_symbolType param_type;
+    unsigned int value_count;
+    void *values;
     unsigned int annotation_count;
     MOJOSHADER_effectAnnotation* annotations;
-    union
-    {
-        unsigned int element_count;
-        unsigned int member_count;
-    };
-    union
-    {
-        MOJOSHADER_effectParam *elements;
-        MOJOSHADER_effectParam *members;
-    };
-    union
-    {
-        unsigned int sampler_state_count;
-        unsigned int value_count;
-    };
-    union
-    {
-        MOJOSHADER_effectSamplerState *sampler_states;
-        void *values;
-    };
 };
 
 typedef struct MOJOSHADER_effectPass
