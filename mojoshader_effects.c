@@ -312,7 +312,7 @@ static void readvalue(const uint8 *base,
         } // if
         else
         {
-            /* TODO: -flibit */
+            /* TODO: See object parsing when it's done -flibit */
         } // else
     } // else if
     else if (class == MOJOSHADER_SYMCLASS_STRUCT)
@@ -582,8 +582,24 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     retval->technique_count = numtechniques;
     readtechniques(numtechniques, base, &ptr, &len, &retval->techniques, m, d);
 
+    if (len < 8)
+        goto parseEffect_unexpectedEOF;
+
+    const int numstrings = readui32(&ptr, &len);
+    const int numobjects = readui32(&ptr, &len);
+
+    // strings...
+    retval->string_count = numstrings;
+    readstrings(numstrings, &ptr, &len, &retval->strings, m, d);
+
+    // objects...
+
+    /* Objects include anything that's not a sampler, string, or scalar.
+     * Basically, textures and shaders.
+     */
+
     // calculate number of shaders from effect pass types...
-    uint32 numshaders = 0;
+    int numshaders = 0;
     for (i = 0; i < numtechniques; i++)
     for (j = 0; j < retval->techniques[i].pass_count; j++)
     for (k = 0; k < retval->techniques[i].passes[j].state_count; k++)
@@ -593,18 +609,8 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
         numshaders++;
     }
 
-    // textures...
-
-    if (len < 8)
-        goto parseEffect_unexpectedEOF;
-
-    const int numstrings = readui32(&ptr, &len);
-    const int numobjects = readui32(&ptr, &len);  // !!! FIXME: "objects" for lack of a better word.
-
-    retval->string_count = numstrings;
-    readstrings(numstrings, &ptr, &len, &retval->strings, m, d);
-
-    const int numtextures = 0; // !!! FIXME: Where did textures go?! -flibit
+    /* FIXME: Why is this wrong? -flibit */
+    const int numtextures = 0; // numobjects - numshaders;
     if (numtextures > 0)
     {
         siz = sizeof (MOJOSHADER_effectTexture) * numtextures;
@@ -705,34 +711,6 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
         } // for
     } // if
-
-    // !!! FIXME: we parse this, but don't expose the data, yet.
-    // mappings ...
-    assert(numshaders <= numobjects);
-#if 0 // !!! FIXME: MAY BE OBSOLETED BY ABOVE CHANGES -flibit
-    const uint32 nummappings = numobjects - numshaders;
-    if (nummappings > 0)
-    {
-        for (i = 0; i < nummappings; i++)
-        {
-            if (len < 24)
-                goto parseEffect_unexpectedEOF;
-
-            /*const uint32 magic = */ readui32(&ptr, &len);
-            /*const uint32 index = */ readui32(&ptr, &len);
-            readui32(&ptr, &len);  // !!! FIXME: what is this field?
-            readui32(&ptr, &len);  // !!! FIXME: what is this field?
-            /*const uint32 type = */ readui32(&ptr, &len);
-            const uint32 mapsize = readui32(&ptr, &len);
-            if (mapsize > 0)
-            {
-                const uint32 readsize = (((mapsize + 3) / 4) * 4);
-                if (len < readsize)
-                    goto parseEffect_unexpectedEOF;
-            } // if
-        } // for
-    } // if
-#endif
 
     retval->profile = (char *) m(strlen(profile) + 1, d);
     if (retval->profile == NULL)

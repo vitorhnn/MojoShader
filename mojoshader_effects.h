@@ -124,7 +124,13 @@ typedef enum MOJOSHADER_renderStateType
     MOJOSHADER_RS_SEPARATEALPHABLENDENABLE,
     MOJOSHADER_RS_SRCBLENDALPHA,
     MOJOSHADER_RS_DESTBLENDALPHA,
-    MOJOSHADER_RS_BLENDOPALPHA
+    MOJOSHADER_RS_BLENDOPALPHA,
+
+    /* These aren't really "states", but these numbers are
+     * referred to by MOJOSHADER_effectStateType as such.
+     */
+    MOJOSHADER_RS_VERTEXSHADER = 146,
+    MOJOSHADER_RS_PIXELSHADER = 147
 } MOJOSHADER_renderStateType;
 
 typedef enum MOJOSHADER_zBufferType
