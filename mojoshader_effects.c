@@ -250,6 +250,7 @@ static void readvalue(const uint8 *base,
     *val_class = (MOJOSHADER_symbolClass) class;
     *val_name = readstring(base, name, m, d);
     *val_semantic = readstring(base, semantic, m, d);
+    *val_element_count = numelements;
 
     if (class == MOJOSHADER_SYMCLASS_SCALAR
      || class == MOJOSHADER_SYMCLASS_VECTOR
@@ -261,7 +262,6 @@ static void readvalue(const uint8 *base,
 
         *val_column_count = columncount;
         *val_row_count = rowcount;
-        *val_element_count = numelements;
 
         if (type == MOJOSHADER_SYMTYPE_BOOL
          || type == MOJOSHADER_SYMTYPE_INT
@@ -273,7 +273,7 @@ static void readvalue(const uint8 *base,
                 siz *= numelements;
             }
             *val_value_count = siz;
-            siz *= (type == MOJOSHADER_SYMTYPE_BOOL) ? 1 : 4;
+            siz *= 4;
             *val_values = m(siz, d);
             memcpy(*val_values, base + valoffset, siz);
         }
