@@ -252,38 +252,36 @@ static void readvalue(const uint8 *base,
     *val_semantic = readstring(base, semantic, m, d);
     *val_element_count = numelements;
 
+    /* Class sanity check */
+    assert(class >= MOJOSHADER_SYMCLASS_SCALAR && class <= MOJOSHADER_SYMCLASS_STRUCT);
+
     if (class == MOJOSHADER_SYMCLASS_SCALAR
      || class == MOJOSHADER_SYMCLASS_VECTOR
      || class == MOJOSHADER_SYMCLASS_MATRIX_ROWS
      || class == MOJOSHADER_SYMCLASS_MATRIX_COLUMNS)
     {
+        /* These classes only ever contain scalar values */
+        assert(type >= MOJOSHADER_SYMTYPE_BOOL && type <= MOJOSHADER_SYMTYPE_FLOAT);
+
         const uint32 columncount = readui32(&typeptr, &typelen);
         const uint32 rowcount = readui32(&typeptr, &typelen);
 
         *val_column_count = columncount;
         *val_row_count = rowcount;
 
-        if (type == MOJOSHADER_SYMTYPE_BOOL
-         || type == MOJOSHADER_SYMTYPE_INT
-         || type == MOJOSHADER_SYMTYPE_FLOAT)
-        {
-            uint32 siz = columncount * rowcount;
-            if (numelements > 0)
-            {
-                siz *= numelements;
-            }
-            *val_value_count = siz;
-            siz *= 4;
-            *val_values = m(siz, d);
-            memcpy(*val_values, base + valoffset, siz);
-        }
-        else
-        {
-            /* TODO: -flibit */
-        }
-    }
+        uint32 siz = columncount * rowcount;
+        if (numelements > 0)
+            siz *= numelements;
+        *val_value_count = siz;
+        siz *= 4;
+        *val_values = m(siz, d);
+        memcpy(*val_values, base + valoffset, siz);
+    } // if
     else if (class == MOJOSHADER_SYMCLASS_OBJECT)
     {
+        /* This class contains either samplers or "objects" */
+        assert(type >= MOJOSHADER_SYMTYPE_STRING && type <= MOJOSHADER_SYMTYPE_VERTEXSHADER);
+
         if (type == MOJOSHADER_SYMTYPE_SAMPLER
          || type == MOJOSHADER_SYMTYPE_SAMPLER1D
          || type == MOJOSHADER_SYMTYPE_SAMPLER2D
@@ -311,30 +309,20 @@ static void readvalue(const uint8 *base,
 
                 state->type = (MOJOSHADER_samplerStateType) type;
                 if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
-                {
-                    /* float types */
-                    state->valueF = *(float *) (base + offsetstart);
-                }
+                    state->valueF = *(float *) (base + offsetstart); /* float types */
                 else
-                {
-                    /* int/enum types */
-                    state->valueI = *(unsigned int *) (base + offsetstart);
-                }
-            }
-        }
-        else if (type == MOJOSHADER_SYMTYPE_TEXTURE)
-        {
-            /* TODO: Default texture values...? -flibit */
-        }
+                    state->valueI = *(unsigned int *) (base + offsetstart); /* int/enum types */
+            } // for
+        } // if
         else
         {
-            /* TODO -flibit */
-        }
-    }
+            /* TODO: -flibit */
+        } // else
+    } // else if
     else if (class == MOJOSHADER_SYMCLASS_STRUCT)
     {
-        /* TODO: -flibit */
-    }
+        /* TODO: Maybe this is like parse_ctab_typeinfo? -flibit */
+    } // else if
 }
 
 static void readannotations(const uint32 numannos,
