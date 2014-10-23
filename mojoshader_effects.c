@@ -212,11 +212,7 @@ static char *readstring(const uint8 *base,
     const char *str = ((const char *) base) + offset;
     const uint32 len = *((const uint32 *) str);
     char *strptr = NULL;
-    if (len == 0)
-    {
-        /* No length? No string. */
-        return NULL;
-    } // if
+    if (len == 0) return NULL; /* No length? No string. */
     strptr = (char *) m(len, d);
     memcpy(strptr, str + 4, len);
     return strptr;
@@ -334,10 +330,7 @@ static void readannotations(const uint32 numannos,
                             void *d)
 {
     int i;
-    if (numannos == 0)
-    {
-        return;
-    } // if
+    if (numannos == 0) return;
 
     const uint32 siz = sizeof(MOJOSHADER_effectAnnotation) * numannos;
     *annotations = (MOJOSHADER_effectAnnotation *) m(siz, d);
@@ -368,10 +361,7 @@ static void readparameters(const uint32 numparams,
                            void *d)
 {
     int i, j;
-    if (numparams == 0)
-    {
-        return;
-    } // if
+    if (numparams == 0) return;
 
     uint32 siz = sizeof(MOJOSHADER_effectParam) * numparams;
     *params = (MOJOSHADER_effectParam *) m(siz, d);
@@ -408,10 +398,7 @@ static void readstates(const uint32 numstates,
                        void *d)
 {
     int i;
-    if (numstates == 0)
-    {
-        return;
-    } // if
+    if (numstates == 0) return;
 
     const uint32 siz = sizeof (MOJOSHADER_effectState) * numstates;
     *states = (MOJOSHADER_effectState *) m(siz, d);
@@ -440,10 +427,7 @@ static void readpasses(const uint32 numpasses,
                        void *d)
 {
     int i;
-    if (numpasses == 0)
-    {
-        return;
-    } // if
+    if (numpasses == 0) return;
 
     const uint32 siz = sizeof (MOJOSHADER_effectPass) * numpasses;
     *passes = (MOJOSHADER_effectPass *) m(siz, d);
@@ -476,10 +460,7 @@ static void readtechniques(const uint32 numtechniques,
                            void *d)
 {
     int i;
-    if (numtechniques == 0)
-    {
-        return;
-    } // if
+    if (numtechniques == 0) return;
 
     const uint32 siz = sizeof (MOJOSHADER_effectTechnique) * numtechniques;
     *techniques = (MOJOSHADER_effectTechnique *) m(siz, d);
@@ -502,6 +483,40 @@ static void readtechniques(const uint32 numtechniques,
         readpasses(numpasses, base, ptr, len, &technique->passes, m, d);
     } // for
 } // readtechniques
+
+static void readstrings(const uint32 numstrings,
+                        const uint8 **ptr,
+                        uint32 *len,
+                        MOJOSHADER_effectString **strings,
+                        MOJOSHADER_malloc m,
+                        void *d)
+{
+    int i;
+    if (numstrings == 0) return;
+
+    const uint32 siz = sizeof (MOJOSHADER_effectString) * numstrings;
+    *strings = (MOJOSHADER_effectString *) m(siz, d);
+    memset(*strings, '\0', siz);
+
+    for (i = 0; i < numstrings; i++)
+    {
+        MOJOSHADER_effectString *string = &(*strings)[i];
+
+        const uint32 index = readui32(ptr, len);
+        const uint32 length = readui32(ptr, len);
+
+        char *str = (char *) m(length, d);
+        memset(str, '\0', length);
+        memcpy(str, *ptr, length);
+
+        /* FIXME: String block is always a multiple of four? -flibit */
+        /* *ptr += length; */
+        *ptr += (length + 3) - ((length - 1) % 4);
+
+        string->index = index;
+        string->string = str;
+    }
+}
 
 // !!! FIXME: this is sort of a big, ugly function.
 const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
@@ -583,9 +598,13 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     if (len < 8)
         goto parseEffect_unexpectedEOF;
 
-    const int numtextures = readui32(&ptr, &len);
+    const int numstrings = readui32(&ptr, &len);
     const int numobjects = readui32(&ptr, &len);  // !!! FIXME: "objects" for lack of a better word.
 
+    retval->string_count = numstrings;
+    readstrings(numstrings, &ptr, &len, &retval->strings, m, d);
+
+    const int numtextures = 0; // !!! FIXME: Where did textures go?! -flibit
     if (numtextures > 0)
     {
         siz = sizeof (MOJOSHADER_effectTexture) * numtextures;

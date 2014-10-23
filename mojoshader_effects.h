@@ -378,6 +378,12 @@ typedef struct MOJOSHADER_effectTechnique
     MOJOSHADER_effectAnnotation* annotations;
 } MOJOSHADER_effectTechnique;
 
+typedef struct MOJOSHADER_effectString
+{
+    unsigned int index;
+    const char *string;
+} MOJOSHADER_effectString;
+
 typedef struct MOJOSHADER_effectTexture
 {
     unsigned int param;
@@ -438,6 +444,18 @@ typedef struct MOJOSHADER_effect
      * This can be NULL on error or if (technique_count) is zero.
      */
     MOJOSHADER_effectTechnique *techniques;
+
+    /*
+     * The number of strings pointed to by (strings).
+     */
+    int string_count;
+
+    /*
+     * (string_count) elemends of data that specify strings used in
+     *  this effect.
+     * This can be NULL on error or if (string_count) is zero.
+     */
+    MOJOSHADER_effectString *strings;
 
     /*
      * The number of elements pointed to by (textures).
