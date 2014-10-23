@@ -278,20 +278,21 @@ static void readvalue(const uint8 *base,
         /* This class contains either samplers or "objects" */
         assert(type >= MOJOSHADER_SYMTYPE_STRING && type <= MOJOSHADER_SYMTYPE_VERTEXSHADER);
 
+        const uint8 *valptr = base + valoffset;
+        unsigned int vallen = 9999999; // !!! FIXME
+
         if (type == MOJOSHADER_SYMTYPE_SAMPLER
          || type == MOJOSHADER_SYMTYPE_SAMPLER1D
          || type == MOJOSHADER_SYMTYPE_SAMPLER2D
          || type == MOJOSHADER_SYMTYPE_SAMPLER3D
          || type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
         {
-            const uint8 *valptr = base + valoffset;
-            unsigned int vallen = 9999999; // !!! FIXME
             const uint32 numstates = readui32(&valptr, &vallen);
 
             *val_value_count = numstates;
 
             const uint32 siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
-            *val_values = (MOJOSHADER_effectSamplerState *) m(siz, d);
+            *val_values = m(siz, d);
             memset(*val_values, '\0', siz);
 
             MOJOSHADER_effectSamplerState *states = (MOJOSHADER_effectSamplerState *) *val_values;
@@ -312,7 +313,17 @@ static void readvalue(const uint8 *base,
         } // if
         else
         {
-            /* TODO: See object parsing when it's done -flibit */
+            uint32 numobjects = 1;
+            if (numelements > 0)
+                numobjects = numelements;
+
+            *val_value_count = numobjects;
+
+            const uint32 siz = 4 * numobjects;
+            *val_values = m(siz, d);
+            memset(*val_values, '\0', siz);
+
+            memcpy(*val_values, base + valoffset, siz);
         } // else
     } // else if
     else if (class == MOJOSHADER_SYMCLASS_STRUCT)
@@ -505,16 +516,18 @@ static void readstrings(const uint32 numstrings,
         const uint32 index = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
-        char *str = (char *) m(length, d);
-        memset(str, '\0', length);
-        memcpy(str, *ptr, length);
+        string->index = index;
+        if (length > 0)
+        {
+            char *str = (char *) m(length, d);
+            memset(str, '\0', length);
+            memcpy(str, *ptr, length);
+            string->string = str;
+        } // if
 
         /* FIXME: String block is always a multiple of four? -flibit */
         /* *ptr += length; */
         *ptr += (length + 3) - ((length - 1) % 4);
-
-        string->index = index;
-        string->string = str;
     }
 }
 
