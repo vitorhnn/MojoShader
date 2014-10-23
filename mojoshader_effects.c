@@ -750,7 +750,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
 
     MOJOSHADER_free f = effect->free;
     void *d = effect->malloc_data;
-    int i, j;
+    int i, j, k;
 
     for (i = 0; i < effect->error_count; i++)
     {
@@ -763,12 +763,20 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
 
     for (i = 0; i < effect->param_count; i++)
     {
-        f((void *) effect->params[i].name, d);
-        f((void *) effect->params[i].semantic, d);
-        if (effect->params[i].values != NULL)
-            f(effect->params[i].values, d);
+        MOJOSHADER_effectParam *param = &effect->params[i];
+        f((void *) param->name, d);
+        f((void *) param->semantic, d);
+        f(param->values, d);
+        for (j = 0; j < param->annotation_count; j++)
+        {
+            MOJOSHADER_effectAnnotation *anno = &param->annotations[j];
+            f((void *) anno->name, d);
+            f((void *) anno->semantic, d);
+            f(anno->values, d);
+        } // for
+        f((void *) param->annotations, d);
     } // for
-    f(effect->params, d);
+    f((void *) effect->params, d);
 
     for (i = 0; i < effect->technique_count; i++)
     {
@@ -776,23 +784,46 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
         f((void *) technique->name, d);
         for (j = 0; j < technique->pass_count; j++)
         {
-            f((void *) technique->passes[j].name, d);
-            f(technique->passes[j].states, d);
+            MOJOSHADER_effectPass *pass = &technique->passes[j];
+            f((void *) pass->name, d);
+            f((void *) pass->states, d);
+            for (k = 0; k < pass->annotation_count; k++)
+            {
+                MOJOSHADER_effectAnnotation *anno = &pass->annotations[k];
+                f((void *) anno->name, d);
+                f((void *) anno->semantic, d);
+                f(anno->values, d);
+            } // for
+            f((void *) pass->annotations, d);
         } // for
-        f(technique->passes, d);
+        f((void *) technique->passes, d);
+        for (j = 0; j < technique->annotation_count; j++)
+        {
+            f((void *) technique->annotations[j].name, d);
+            f((void *) technique->annotations[j].semantic, d);
+            f(technique->annotations[j].values, d);
+        } // for
+        f((void *) technique->annotations, d);
     } // for
+    f((void *) effect->techniques, d);
 
-    f(effect->techniques, d);
+    for (i = 0; i < effect->string_count; i++)
+    {
+        MOJOSHADER_effectString *string = &effect->strings[i];
+        if (string->string != NULL)
+            f((void *) string->string, d);
+    } // for
+    f((void *) effect->strings, d);
 
     for (i = 0; i < effect->texture_count; i++)
         f((void *) effect->textures[i].name, d);
-    f(effect->textures, d);
+    f((void *) effect->textures, d);
 
     for (i = 0; i < effect->shader_count; i++)
         MOJOSHADER_freeParseData(effect->shaders[i].shader);
-    f(effect->shaders, d);
+    f((void *) effect->shaders, d);
 
-    f(effect, d);
+    f((void *) effect, d);
 } // MOJOSHADER_freeEffect
 
 // end of mojoshader_effects.c ...
