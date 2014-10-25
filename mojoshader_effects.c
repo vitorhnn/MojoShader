@@ -518,22 +518,21 @@ static void readstrings(const uint32 numstrings,
         if (length > 0)
         {
             char *str = (char *) m(length, d);
-            memset(str, '\0', length);
             memcpy(str, *ptr, length);
             string->string = str;
         } // if
 
         /* String block is always a multiple of four */
-        *ptr += (length + 3) - ((length - 1) % 4);
+        const uint32 blocklen = (length + 3) - ((length - 1) % 4);
+        *ptr += blocklen;
+        *len -= blocklen;
     }
 }
 
 static void readobjects(const uint32 numobjects,
                         const uint8 **ptr,
                         uint32 *len,
-                        const MOJOSHADER_effect *effect,
-                        const uint32 numshaders,
-                        MOJOSHADER_effectShader **shaders,
+                        MOJOSHADER_effectObject **objects,
                         const char *profile,
                         const MOJOSHADER_swizzle *swiz,
                         const unsigned int swizcount,
@@ -546,56 +545,57 @@ static void readobjects(const uint32 numobjects,
     int i;
     if (numobjects == 0) return;
 
-    if (numshaders > 0)
-    {
-        const uint32 siz = sizeof (MOJOSHADER_effectShader) * numshaders;
-        *shaders = (MOJOSHADER_effectShader *) m(siz, d);
-        memset(*shaders, '\0', siz);
-    } // if
+    const uint32 siz = sizeof (MOJOSHADER_effectObject) * numobjects;
+    *objects = (MOJOSHADER_effectObject *) m(siz, d);
+    memset(*objects, '\0', siz);
 
-    for (i = 0; i < numshaders; i++)
+    for (i = 0; i < numobjects; i++)
     {
-        MOJOSHADER_effectShader *shader = &(*shaders)[i];
+        MOJOSHADER_effectObject *object = &(*objects)[i];
 
         const uint32 technique = readui32(ptr, len);
-        const uint32 pass = readui32(ptr, len);
-        readui32(ptr, len);  // !!! FIXME: don't know what this does.
+        const uint32 index = readui32(ptr, len);
+        /*const uint32 FIXME =*/ readui32(ptr, len);
         const uint32 state = readui32(ptr, len);
-        readui32(ptr, len);  // !!! FIXME: don't know what this does.
+        const uint32 type = readui32(ptr, len);
 
-        /* TODO: Only reading shaders for now. */
-        MOJOSHADER_renderStateType type = effect->techniques[technique].passes[pass].states[state].type;
-        assert(type == MOJOSHADER_RS_VERTEXSHADER || type == MOJOSHADER_RS_PIXELSHADER);
+        /* FIXME: More types...? */
+        assert(type == 0 || type == 1);
 
-        const uint32 shadersize = readui32(ptr, len);
-
-        shader->technique = technique;
-        shader->pass = pass;
-        shader->shader = MOJOSHADER_parse(profile, *ptr, shadersize,
-                                          swiz, swizcount, smap, smapcount,
-                                          m, f, d);
-
-        // !!! FIXME: check for errors.
-
-        *ptr += shadersize;
-        *len -= shadersize;
-
-        // !!! FIXME: How does this affect numobjects? -flibit
-        while (*((uint32*) *ptr) == -1)
+        if (type == 0)
         {
-            /*const uint32 magic =*/ readui32(ptr, len);
-            /*const uint32 index =*/ readui32(ptr, len);
-            readui32(ptr, len);  // !!! FIXME: what is this field?
-            readui32(ptr, len);  // !!! FIXME: what is this field?
-            /*const uint32 type =*/ readui32(ptr, len);
-            const uint32 mapsize = readui32(ptr, len);
-            if (mapsize > 0)
+            const uint32 shadersize = readui32(ptr, len);
+
+            object->type = MOJOSHADER_OBJECTTYPE_SHADER;
+            object->shader.technique = technique;
+            object->shader.pass = index;
+            object->shader.shader = MOJOSHADER_parse(profile, *ptr, shadersize,
+                                                     swiz, swizcount, smap, smapcount,
+                                                     m, f, d);
+
+            // !!! FIXME: check for errors.
+
+            *ptr += shadersize;
+            *len -= shadersize;
+        } // if
+        else
+        {
+            const uint32 length = readui32(ptr, len);
+
+            object->type = MOJOSHADER_OBJECTTYPE_MAPPING;
+            object->mapping.param = index;
+            if (length > 0)
             {
-                const uint32 readsize = (((mapsize + 3) / 4) * 4);
-                *ptr += readsize; // !!! FIXME: Skipping a string! -flibit
-                *len -= readsize;
+                char *str = (char *) m(length, d);
+                memcpy(str, *ptr, length);
+                object->mapping.name = str;
             } // if
-        } // while
+
+            /* String block is always a multiple of four */
+            const uint32 blocklen = (length + 3) - ((length - 1) % 4);
+            *ptr += blocklen;
+            *len -= blocklen;
+        } // else
     } // for
 } // readobjects
 
@@ -682,23 +682,10 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     /* Parse effect "object" table.
      * Objects include anything that's not a sampler, string, or scalar.
      */
-
-    // calculate number of shaders from effect pass types, for now...
-    int numshaders = 0;
-    for (i = 0; i < numtechniques; i++)
-    for (j = 0; j < retval->techniques[i].pass_count; j++)
-    for (k = 0; k < retval->techniques[i].passes[j].state_count; k++)
-    if ((retval->techniques[i].passes[j].states[k].type == 0x92)
-     || (retval->techniques[i].passes[j].states[k].type == 0x93))
-    {
-        numshaders++;
-    }
-
-    /* FIXME: Do we want separate object lists, or just one megalist? -flibit */
-    retval->shader_count = numshaders;
-    readobjects(numobjects, &ptr, &len, retval,
-                numshaders, &retval->shaders,
-                profile, swiz, swizcount, smap, smapcount, m, f, d);
+    retval->object_count = numobjects;
+    readobjects(numobjects, &ptr, &len, &retval->objects,
+                profile, swiz, swizcount, smap, smapcount,
+                m, f, d);
 
     /* Store MojoShader profile in effect structure */
     retval->profile = (char *) m(strlen(profile) + 1, d);
@@ -707,7 +694,6 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     strcpy((char *) retval->profile, profile);
 
     return retval;
-
 
 // !!! FIXME: do something with this.
 parseEffect_notAnEffectsFile:
@@ -796,10 +782,16 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     } // for
     f((void *) effect->strings, d);
 
-    /* Free shader table */
-    for (i = 0; i < effect->shader_count; i++)
-        MOJOSHADER_freeParseData(effect->shaders[i].shader);
-    f((void *) effect->shaders, d);
+    /* Free object table */
+    for (i = 0; i < effect->object_count; i++)
+    {
+        MOJOSHADER_effectObject *object = &effect->objects[i];
+        if (object->type == MOJOSHADER_OBJECTTYPE_SHADER)
+            MOJOSHADER_freeParseData(object->shader.shader);
+        else if (object->type == MOJOSHADER_OBJECTTYPE_MAPPING)
+            f((void *) object->mapping.name, d);
+    } // for
+    f((void *) effect->objects, d);
 
     /* Free base effect structure */
     f((void *) effect, d);

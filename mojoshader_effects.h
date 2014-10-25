@@ -390,12 +390,33 @@ typedef struct MOJOSHADER_effectString
     const char *string;
 } MOJOSHADER_effectString;
 
+typedef enum
+{
+    MOJOSHADER_OBJECTTYPE_SHADER,
+    MOJOSHADER_OBJECTTYPE_MAPPING
+} MOJOSHADER_effectObjectType;
+
 typedef struct MOJOSHADER_effectShader
 {
+    MOJOSHADER_effectObjectType type;
     unsigned int technique;
     unsigned int pass;
     const MOJOSHADER_parseData *shader;
 } MOJOSHADER_effectShader;
+
+typedef struct MOJOSHADER_effectMapping
+{
+    MOJOSHADER_effectObjectType type;
+    unsigned int param;
+    const char *name;
+} MOJOSHADER_effectMapping;
+
+typedef union MOJOSHADER_effectObject
+{
+    MOJOSHADER_effectObjectType type;
+    MOJOSHADER_effectShader shader;
+    MOJOSHADER_effectMapping mapping;
+} MOJOSHADER_effectObject;
 
 /*
  * Structure used to return data from parsing of an effect file...
@@ -458,16 +479,16 @@ typedef struct MOJOSHADER_effect
     MOJOSHADER_effectString *strings;
 
     /*
-     * The number of elements pointed to by (shaders).
+     * The number of elements pointed to by (objects).
      */
-    int shader_count;
+    int object_count;
 
     /*
-     * (shader_count) elements of data that specify shaders used in
+     * (object_count) elements of data that specify objects used in
      *  this effect.
-     * This can be NULL on error or if (shader_count) is zero.
+     * This can be NULL on error or if (object_count) is zero.
      */
-    MOJOSHADER_effectShader *shaders;
+    MOJOSHADER_effectObject *objects;
 
     /*
      * This is the malloc implementation you passed to MOJOSHADER_parseEffect().
