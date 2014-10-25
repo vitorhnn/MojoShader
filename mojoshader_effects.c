@@ -321,8 +321,6 @@ static void readvalue(const uint8 *base,
 
             const uint32 siz = 4 * numobjects;
             *val_values = m(siz, d);
-            memset(*val_values, '\0', siz);
-
             memcpy(*val_values, base + valoffset, siz);
         } // else
     } // else if
@@ -525,13 +523,82 @@ static void readstrings(const uint32 numstrings,
             string->string = str;
         } // if
 
-        /* FIXME: String block is always a multiple of four? -flibit */
-        /* *ptr += length; */
+        /* String block is always a multiple of four */
         *ptr += (length + 3) - ((length - 1) % 4);
     }
 }
 
-// !!! FIXME: this is sort of a big, ugly function.
+static void readobjects(const uint32 numobjects,
+                        const uint8 **ptr,
+                        uint32 *len,
+                        const MOJOSHADER_effect *effect,
+                        const uint32 numshaders,
+                        MOJOSHADER_effectShader **shaders,
+                        const char *profile,
+                        const MOJOSHADER_swizzle *swiz,
+                        const unsigned int swizcount,
+                        const MOJOSHADER_samplerMap *smap,
+                        const unsigned int smapcount,
+                        MOJOSHADER_malloc m,
+                        MOJOSHADER_free f,
+                        void *d)
+{
+    int i;
+    if (numobjects == 0) return;
+
+    if (numshaders > 0)
+    {
+        const uint32 siz = sizeof (MOJOSHADER_effectShader) * numshaders;
+        *shaders = (MOJOSHADER_effectShader *) m(siz, d);
+        memset(*shaders, '\0', siz);
+    } // if
+
+    for (i = 0; i < numshaders; i++)
+    {
+        MOJOSHADER_effectShader *shader = &(*shaders)[i];
+
+        const uint32 technique = readui32(ptr, len);
+        const uint32 pass = readui32(ptr, len);
+        readui32(ptr, len);  // !!! FIXME: don't know what this does.
+        const uint32 state = readui32(ptr, len);
+        readui32(ptr, len);  // !!! FIXME: don't know what this does.
+
+        /* TODO: Only reading shaders for now. */
+        MOJOSHADER_renderStateType type = effect->techniques[technique].passes[pass].states[state].type;
+        assert(type == MOJOSHADER_RS_VERTEXSHADER || type == MOJOSHADER_RS_PIXELSHADER);
+
+        const uint32 shadersize = readui32(ptr, len);
+
+        shader->technique = technique;
+        shader->pass = pass;
+        shader->shader = MOJOSHADER_parse(profile, *ptr, shadersize,
+                                          swiz, swizcount, smap, smapcount,
+                                          m, f, d);
+
+        // !!! FIXME: check for errors.
+
+        *ptr += shadersize;
+        *len -= shadersize;
+
+        // !!! FIXME: How does this affect numobjects? -flibit
+        while (*((uint32*) *ptr) == -1)
+        {
+            /*const uint32 magic =*/ readui32(ptr, len);
+            /*const uint32 index =*/ readui32(ptr, len);
+            readui32(ptr, len);  // !!! FIXME: what is this field?
+            readui32(ptr, len);  // !!! FIXME: what is this field?
+            /*const uint32 type =*/ readui32(ptr, len);
+            const uint32 mapsize = readui32(ptr, len);
+            if (mapsize > 0)
+            {
+                const uint32 readsize = (((mapsize + 3) / 4) * 4);
+                *ptr += readsize; // !!! FIXME: Skipping a string! -flibit
+                *len -= readsize;
+            } // if
+        } // while
+    } // for
+} // readobjects
+
 const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                                                 const unsigned char *buf,
                                                 const unsigned int _len,
@@ -543,29 +610,34 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                                                 MOJOSHADER_free f,
                                                 void *d)
 {
-    if ( ((m == NULL) && (f != NULL)) || ((m != NULL) && (f == NULL)) )
-        return &MOJOSHADER_out_of_mem_effect;  // supply both or neither.
-
-    if (m == NULL) m = MOJOSHADER_internal_malloc;
-    if (f == NULL) f = MOJOSHADER_internal_free;
-
-    MOJOSHADER_effect *retval = m(sizeof (MOJOSHADER_effect), d);
-    if (retval == NULL)
-        return &MOJOSHADER_out_of_mem_effect;  // supply both or neither.
-    memset(retval, '\0', sizeof (*retval));
-
-    retval->malloc = m;
-    retval->free = f;
-    retval->malloc_data = d;
-
     const uint8 *ptr = (const uint8 *) buf;
     uint32 len = (uint32) _len;
     size_t siz = 0;
     int i, j, k;
 
+    /* Supply both m and f, or neither */
+    if ( ((m == NULL) && (f != NULL)) || ((m != NULL) && (f == NULL)) )
+        return &MOJOSHADER_out_of_mem_effect;
+
+    /* Use default malloc/free if m/f were not passed */
+    if (m == NULL) m = MOJOSHADER_internal_malloc;
+    if (f == NULL) f = MOJOSHADER_internal_free;
+
+    /* malloc base effect structure */
+    MOJOSHADER_effect *retval = m(sizeof (MOJOSHADER_effect), d);
+    if (retval == NULL)
+        return &MOJOSHADER_out_of_mem_effect;
+    memset(retval, '\0', sizeof (*retval));
+
+    /* Store m/f/d in effect structure */
+    retval->malloc = m;
+    retval->free = f;
+    retval->malloc_data = d;
+
     if (len < 8)
         goto parseEffect_unexpectedEOF;
 
+    /* Read in header magic, seek to initial offset */
     const uint8 *base = NULL;
     if (readui32(&ptr, &len) != 0xFEFF0901)
         goto parseEffect_notAnEffectsFile;
@@ -582,36 +654,36 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     if (len < 16)
         goto parseEffect_unexpectedEOF;
 
+    /* Parse structure counts */
     const uint32 numparams = readui32(&ptr, &len);
     const uint32 numtechniques = readui32(&ptr, &len);
-    /*const uint32 FIXME = */ readui32(&ptr, &len);
-    /*const uint32 numobjects = */ readui32(&ptr, &len);
+    /*const uint32 FIXME =*/ readui32(&ptr, &len);
+    /*const uint32 numobjects =*/ readui32(&ptr, &len);
 
-    // params...
+    /* Parse effect parameters */
     retval->param_count = numparams;
     readparameters(numparams, base, &ptr, &len, &retval->params, m, d);
 
-    // techniques...
+    /* Parse effect techniques */
     retval->technique_count = numtechniques;
     readtechniques(numtechniques, base, &ptr, &len, &retval->techniques, m, d);
 
     if (len < 8)
         goto parseEffect_unexpectedEOF;
 
+    /* Parse object counts */
     const int numstrings = readui32(&ptr, &len);
     const int numobjects = readui32(&ptr, &len);
 
-    // strings...
+    /* Parse effect string table */
     retval->string_count = numstrings;
     readstrings(numstrings, &ptr, &len, &retval->strings, m, d);
 
-    // objects...
-
-    /* Objects include anything that's not a sampler, string, or scalar.
-     * Basically, textures and shaders.
+    /* Parse effect "object" table.
+     * Objects include anything that's not a sampler, string, or scalar.
      */
 
-    // calculate number of shaders from effect pass types...
+    // calculate number of shaders from effect pass types, for now...
     int numshaders = 0;
     for (i = 0; i < numtechniques; i++)
     for (j = 0; j < retval->techniques[i].pass_count; j++)
@@ -622,109 +694,13 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
         numshaders++;
     }
 
-    /* FIXME: Why is this wrong? -flibit */
-    const int numtextures = 0; // numobjects - numshaders;
-    if (numtextures > 0)
-    {
-        siz = sizeof (MOJOSHADER_effectTexture) * numtextures;
-        retval->textures = m(siz, d);
-        if (retval->textures == NULL)
-            goto parseEffect_outOfMemory;
-        memset(retval->textures, '\0', siz);
+    /* FIXME: Do we want separate object lists, or just one megalist? -flibit */
+    retval->shader_count = numshaders;
+    readobjects(numobjects, &ptr, &len, retval,
+                numshaders, &retval->shaders,
+                profile, swiz, swizcount, smap, smapcount, m, f, d);
 
-        for (i = 0; i < numtextures; i++)
-        {
-            if (len < 8)
-                goto parseEffect_unexpectedEOF;
-
-            MOJOSHADER_effectTexture *texture = &retval->textures[i];
-            const uint32 texparam = readui32(&ptr, &len);
-            const uint32 texsize = readui32(&ptr, &len);
-            // apparently texsize will pad out to 32 bits.
-            const uint32 readsize = (((texsize + 3) / 4) * 4);
-            if (len < readsize)
-                goto parseEffect_unexpectedEOF;
-
-            texture->param = texparam;
-            char *str = m(texsize + 1, d);
-            if (str == NULL)
-                goto parseEffect_outOfMemory;
-            memcpy(str, ptr, texsize);
-            str[texsize] = '\0';
-            texture->name = str;
-
-            ptr += readsize;
-            len -= readsize;
-        } // for
-    } // if
-
-    // shaders...
-
-    if (numshaders > 0)
-    {
-        siz = sizeof (MOJOSHADER_effectShader) * numshaders;
-        retval->shaders = (MOJOSHADER_effectShader *) m(siz, d);
-        if (retval->shaders == NULL)
-            goto parseEffect_outOfMemory;
-        memset(retval->shaders, '\0', siz);
-
-        retval->shader_count = numshaders;
-
-        // !!! FIXME: I wonder if we should pull these from offsets and not
-        // !!! FIXME:  count on them all being in a line like this.
-        for (i = 0; i < numshaders; i++)
-        {
-            if (len < 24)
-                goto parseEffect_unexpectedEOF;
-
-            MOJOSHADER_effectShader *shader = &retval->shaders[i];
-            const uint32 technique = readui32(&ptr, &len);
-            const uint32 pass = readui32(&ptr, &len);
-            readui32(&ptr, &len);  // !!! FIXME: don't know what this does.
-            readui32(&ptr, &len);  // !!! FIXME: don't know what this does (vertex/pixel/geometry?)
-            readui32(&ptr, &len);  // !!! FIXME: don't know what this does.
-            const uint32 shadersize = readui32(&ptr, &len);
-
-            if (len < shadersize)
-                goto parseEffect_unexpectedEOF;
-
-            shader->technique = technique;
-            shader->pass = pass;
-            shader->shader = MOJOSHADER_parse(profile, ptr, shadersize,
-                                              swiz, swizcount, smap, smapcount,
-                                              m, f, d);
-
-            // !!! FIXME: check for errors.
-
-            ptr += shadersize;
-            len -= shadersize;
-
-            /* flibit "figured this out". */
-            // !!! FIXME: How does this affect numobjects? -flibit
-            while (*((uint32*) ptr) == -1)
-            {
-                /* const uint32 magic = */ readui32(&ptr, &len);
-                /* const uint32 index = */ readui32(&ptr, &len);
-                readui32(&ptr, &len);  // !!! FIXME: what is this field?
-                readui32(&ptr, &len);  // !!! FIXME: what is this field?
-                /*const uint32 type = */ readui32(&ptr, &len);
-                const uint32 mapsize = readui32(&ptr, &len);
-                if (mapsize > 0)
-                {
-                    const uint32 readsize = (((mapsize + 3) / 4) * 4);
-                    if (len < readsize)
-                        goto parseEffect_unexpectedEOF;
-                    else
-                    {
-                        ptr += readsize; // !!! FIXME: Skipping a string! -flibit
-                        len -= readsize;
-                    } // else
-                } // if
-            } // while
-
-        } // for
-    } // if
-
+    /* Store MojoShader profile in effect structure */
     retval->profile = (char *) m(strlen(profile) + 1, d);
     if (retval->profile == NULL)
         goto parseEffect_outOfMemory;
@@ -752,6 +728,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     void *d = effect->malloc_data;
     int i, j, k;
 
+    /* Free errors */
     for (i = 0; i < effect->error_count; i++)
     {
         f((void *) effect->errors[i].error, d);
@@ -759,8 +736,10 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     } // for
     f((void *) effect->errors, d);
 
+    /* Free profile string */
     f((void *) effect->profile, d);
 
+    /* Free parameters, including annotations */
     for (i = 0; i < effect->param_count; i++)
     {
         MOJOSHADER_effectParam *param = &effect->params[i];
@@ -778,6 +757,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     } // for
     f((void *) effect->params, d);
 
+    /* Free techniques, including passes and all annotations */
     for (i = 0; i < effect->technique_count; i++)
     {
         MOJOSHADER_effectTechnique *technique = &effect->techniques[i];
@@ -807,6 +787,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     } // for
     f((void *) effect->techniques, d);
 
+    /* Free string table */
     for (i = 0; i < effect->string_count; i++)
     {
         MOJOSHADER_effectString *string = &effect->strings[i];
@@ -815,14 +796,12 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     } // for
     f((void *) effect->strings, d);
 
-    for (i = 0; i < effect->texture_count; i++)
-        f((void *) effect->textures[i].name, d);
-    f((void *) effect->textures, d);
-
+    /* Free shader table */
     for (i = 0; i < effect->shader_count; i++)
         MOJOSHADER_freeParseData(effect->shaders[i].shader);
     f((void *) effect->shaders, d);
 
+    /* Free base effect structure */
     f((void *) effect, d);
 } // MOJOSHADER_freeEffect
 
