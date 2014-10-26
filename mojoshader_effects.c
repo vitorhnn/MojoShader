@@ -612,8 +612,6 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 {
     const uint8 *ptr = (const uint8 *) buf;
     uint32 len = (uint32) _len;
-    size_t siz = 0;
-    int i, j, k;
 
     /* Supply both m and f, or neither */
     if ( ((m == NULL) && (f != NULL)) || ((m != NULL) && (f == NULL)) )
