@@ -328,7 +328,7 @@ static void readvalue(const uint8 *base,
     {
         /* TODO: Maybe this is like parse_ctab_typeinfo? -flibit */
     } // else if
-}
+} // readvalue
 
 static void readannotations(const uint32 numannos,
                             const uint8 *base,
@@ -526,8 +526,8 @@ static void readstrings(const uint32 numstrings,
         const uint32 blocklen = (length + 3) - ((length - 1) % 4);
         *ptr += blocklen;
         *len -= blocklen;
-    }
-}
+    } // for
+} // readstrings
 
 static void readobjects(const uint32 numobjects,
                         const uint8 **ptr,
