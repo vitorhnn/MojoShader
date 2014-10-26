@@ -350,8 +350,7 @@ typedef struct MOJOSHADER_effectAnnotation
     void *values;
 } MOJOSHADER_effectAnnotation;
 
-typedef struct MOJOSHADER_effectParam MOJOSHADER_effectParam;
-struct MOJOSHADER_effectParam
+typedef struct MOJOSHADER_effectParam
 {
     const char *name;
     const char *semantic;
@@ -364,7 +363,7 @@ struct MOJOSHADER_effectParam
     void *values;
     unsigned int annotation_count;
     MOJOSHADER_effectAnnotation* annotations;
-};
+} MOJOSHADER_effectParam;
 
 typedef struct MOJOSHADER_effectPass
 {
@@ -390,7 +389,7 @@ typedef struct MOJOSHADER_effectString
     const char *string;
 } MOJOSHADER_effectString;
 
-typedef enum
+typedef enum MOJOSHADER_effectObjectType
 {
     MOJOSHADER_OBJECTTYPE_SHADER,
     MOJOSHADER_OBJECTTYPE_MAPPING
