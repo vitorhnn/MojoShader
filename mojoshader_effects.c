@@ -755,6 +755,13 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
         {
             MOJOSHADER_effectPass *pass = &technique->passes[j];
             f((void *) pass->name, d);
+            for (k = 0; k < pass->state_count; k++)
+            {
+                MOJOSHADER_effectState *state = &pass->states[k];
+                f((void *) state->name, d);
+                f((void *) state->semantic, d);
+                f(state->values, d);
+            } // for
             f((void *) pass->states, d);
             for (k = 0; k < pass->annotation_count; k++)
             {
