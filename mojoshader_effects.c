@@ -517,21 +517,60 @@ static void readsmallobjects(const uint32 numsmallobjects,
 
     for (i = 1; i < numsmallobjects + 1; i++)
     {
-        objects[i].type = MOJOSHADER_SYMTYPE_STRING;
-        MOJOSHADER_effectString *string = &objects[i].string;
+        MOJOSHADER_effectObject *object = &objects[i];
 
         const uint32 index = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
-        string->index = index;
-        if (length > 0)
+        if (object->type == MOJOSHADER_SYMTYPE_STRING)
         {
-            char *str = (char *) m(length, d);
-            memcpy(str, *ptr, length);
-            string->string = str;
+            object->string.index = index;
+            if (length > 0)
+            {
+                char *str = (char *) m(length, d);
+                memcpy(str, *ptr, length);
+                object->string.string = str;
+            } // if
         } // if
+        else if (object->type == MOJOSHADER_SYMTYPE_TEXTURE
+              || object->type == MOJOSHADER_SYMTYPE_TEXTURE1D
+              || object->type == MOJOSHADER_SYMTYPE_TEXTURE2D
+              || object->type == MOJOSHADER_SYMTYPE_TEXTURE3D
+              || object->type == MOJOSHADER_SYMTYPE_TEXTURECUBE)
+        {
+            object->texture.index = index;
+            object->texture.tex_register = *((uint32 *) *ptr);
+        } // else if
+        else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER2D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER3D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
+        {
+            object->mapping.param = index;
+            if (length > 0)
+            {
+                char *str = (char *) m(length, d);
+                memcpy(str, *ptr, length);
+                object->mapping.name = str;
+            } // if
+        } // else if
+        else if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
+              || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
+        {
+            object->shader.technique = -1;
+            object->shader.pass = -1;
+            object->shader.shader = MOJOSHADER_parse(profile, *ptr, length,
+                                                     swiz, swizcount, smap, smapcount,
+                                                     m, f, d);
+            // !!! FIXME: check for errors.
+        } // else if
+        else
+        {
+            assert(0 && "Small object type unknown!");
+        } // else
 
-        /* String block is always a multiple of four */
+        /* Object block is always a multiple of four */
         const uint32 blocklen = (length + 3) - ((length - 1) % 4);
         *ptr += blocklen;
         *len -= blocklen;
@@ -564,32 +603,29 @@ static void readlargeobjects(const uint32 numlargeobjects,
         const uint32 index = readui32(ptr, len);
         /*const uint32 FIXME =*/ readui32(ptr, len);
         const uint32 state = readui32(ptr, len);
-        const uint32 type = readui32(ptr, len);
+        /*const uint32 type =*/ readui32(ptr, len);
+        const uint32 length = readui32(ptr, len);
 
-        /* FIXME: More types...? */
-        assert(type == 0 || type == 1);
-
-        if (type == 0)
+        if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
+         || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
-            const uint32 shadersize = readui32(ptr, len);
-
-            object->type = MOJOSHADER_SYMTYPE_PIXELSHADER; // Arbitrary...
             object->shader.technique = technique;
             object->shader.pass = index;
-            object->shader.shader = MOJOSHADER_parse(profile, *ptr, shadersize,
+            object->shader.shader = MOJOSHADER_parse(profile, *ptr, length,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
 
             // !!! FIXME: check for errors.
 
-            *ptr += shadersize;
-            *len -= shadersize;
+            *ptr += length;
+            *len -= length;
         } // if
-        else
+        else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER2D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER3D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
         {
-            const uint32 length = readui32(ptr, len);
-
-            object->type = MOJOSHADER_SYMTYPE_SAMPLER; // Arbitrary...
             object->mapping.param = index;
             if (length > 0)
             {
@@ -602,6 +638,10 @@ static void readlargeobjects(const uint32 numlargeobjects,
             const uint32 blocklen = (length + 3) - ((length - 1) % 4);
             *ptr += blocklen;
             *len -= blocklen;
+        } // else if
+        else
+        {
+            assert(0 && "Large object type unknown!");
         } // else
     } // for
 } // readobjects
