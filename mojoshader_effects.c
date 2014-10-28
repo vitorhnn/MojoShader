@@ -500,6 +500,7 @@ static void readtechniques(const uint32 numtechniques,
     } // for
 } // readtechniques
 
+/* FIXME: THIS CAN CONTAIN MORE THAN STRINGS! SEE BASICEFFECT! D: -flibit */
 static void readstrings(const uint32 numstrings,
                         const uint8 **ptr,
                         uint32 *len,
