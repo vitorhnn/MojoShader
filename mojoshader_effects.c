@@ -301,14 +301,16 @@ static void readvalue(const uint8 *base,
                 MOJOSHADER_effectSamplerState *state = &states[i];
                 const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
                 /*const uint32 FIXME =*/ readui32(&valptr, &vallen);
-                /*const uint32 offset =*/ readui32(&valptr, &vallen);
-                const uint32 offsetstart = readui32(&valptr, &vallen);
+                const uint32 statetypeoffset = readui32(&valptr, &vallen);
+                const uint32 statevaloffset = readui32(&valptr, &vallen);
 
                 state->type = (MOJOSHADER_samplerStateType) type;
-                if (state->type == MOJOSHADER_SAMP_MIPMAPLODBIAS)
-                    state->valueF = *(float *) (base + offsetstart); /* float types */
-                else
-                    state->valueI = *(unsigned int *) (base + offsetstart); /* int/enum types */
+                readvalue(base, statetypeoffset, statevaloffset,
+                          &state->state_type, &state->state_class,
+                          &state->name, &state->semantic, // FIXME: May need to be freed!
+                          &state->element_count, &state->row_count, &state->column_count,
+                          &state->value_count, &state->values,
+                          m, d);
             } // for
         } // if
         else

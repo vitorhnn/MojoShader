@@ -336,12 +336,21 @@ typedef enum MOJOSHADER_textureFilterType
 typedef struct MOJOSHADER_effectSamplerState
 {
     MOJOSHADER_samplerStateType type;
+    const char *name;
+    const char *semantic;
+    unsigned int element_count;
+    unsigned int row_count;
+    unsigned int column_count;
+    MOJOSHADER_symbolClass state_class;
+    MOJOSHADER_symbolType state_type;
+    unsigned int value_count;
     union
     {
-        unsigned int                   valueI;
-        float                          valueF;
-        MOJOSHADER_textureAddress      valueTA;
-        MOJOSHADER_textureFilterType   valueTFT;
+        void                         *values; /* Raw value */
+        unsigned int                 *valuesI;
+        float                        *valuesF;
+        MOJOSHADER_textureAddress    *valuesTA;
+        MOJOSHADER_textureFilterType *valuesTFT;
     };
 } MOJOSHADER_effectSamplerState;
 
