@@ -478,24 +478,25 @@ static void readtechniques(const uint32 numtechniques,
     } // for
 } // readtechniques
 
-/* FIXME: THIS CAN CONTAIN MORE THAN STRINGS! SEE BASICEFFECT! D: -flibit */
-static void readstrings(const uint32 numstrings,
-                        const uint8 **ptr,
-                        uint32 *len,
-                        MOJOSHADER_effectString **strings,
-                        MOJOSHADER_malloc m,
-                        void *d)
+static void readsmallobjects(const uint32 numsmallobjects,
+                             const uint8 **ptr,
+                             uint32 *len,
+                             MOJOSHADER_effectObject **objects,
+                             const char *profile,
+                             const MOJOSHADER_swizzle *swiz,
+                             const unsigned int swizcount,
+                             const MOJOSHADER_samplerMap *smap,
+                             const unsigned int smapcount,
+                             MOJOSHADER_malloc m,
+                             MOJOSHADER_free f,
+                             void *d)
 {
     int i;
-    if (numstrings == 0) return;
+    if (numsmallobjects == 0) return;
 
-    const uint32 siz = sizeof (MOJOSHADER_effectString) * numstrings;
-    *strings = (MOJOSHADER_effectString *) m(siz, d);
-    memset(*strings, '\0', siz);
-
-    for (i = 0; i < numstrings; i++)
+    for (i = 1; i < numsmallobjects + 1; i++)
     {
-        MOJOSHADER_effectString *string = &(*strings)[i];
+        MOJOSHADER_effectString *string = &(*objects)[i].string;
 
         const uint32 index = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
@@ -515,27 +516,25 @@ static void readstrings(const uint32 numstrings,
     } // for
 } // readstrings
 
-static void readobjects(const uint32 numobjects,
-                        const uint8 **ptr,
-                        uint32 *len,
-                        MOJOSHADER_effectObject **objects,
-                        const char *profile,
-                        const MOJOSHADER_swizzle *swiz,
-                        const unsigned int swizcount,
-                        const MOJOSHADER_samplerMap *smap,
-                        const unsigned int smapcount,
-                        MOJOSHADER_malloc m,
-                        MOJOSHADER_free f,
-                        void *d)
+static void readlargeobjects(const uint32 numlargeobjects,
+                             const uint32 numsmallobjects,
+                             const uint8 **ptr,
+                             uint32 *len,
+                             MOJOSHADER_effectObject **objects,
+                             const char *profile,
+                             const MOJOSHADER_swizzle *swiz,
+                             const unsigned int swizcount,
+                             const MOJOSHADER_samplerMap *smap,
+                             const unsigned int smapcount,
+                             MOJOSHADER_malloc m,
+                             MOJOSHADER_free f,
+                             void *d)
 {
     int i;
-    if (numobjects == 0) return;
+    if (numlargeobjects == 0) return;
 
-    const uint32 siz = sizeof (MOJOSHADER_effectObject) * numobjects;
-    *objects = (MOJOSHADER_effectObject *) m(siz, d);
-    memset(*objects, '\0', siz);
-
-    for (i = 0; i < numobjects; i++)
+    int numobjects = numsmallobjects + numlargeobjects + 1;
+    for (i = numsmallobjects + 1; i < numobjects; i++)
     {
         MOJOSHADER_effectObject *object = &(*objects)[i];
 
@@ -642,7 +641,15 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     const uint32 numparams = readui32(&ptr, &len);
     const uint32 numtechniques = readui32(&ptr, &len);
     /*const uint32 FIXME =*/ readui32(&ptr, &len);
-    /*const uint32 numobjects =*/ readui32(&ptr, &len);
+    const uint32 numobjects = readui32(&ptr, &len);
+
+    /* Alloc structures now, so object types can be stored */
+    retval->object_count = numobjects;
+    const uint32 siz = sizeof (MOJOSHADER_effectObject) * numobjects;
+    retval->objects = (MOJOSHADER_effectObject *) m(siz, d);
+    if (retval->objects == NULL)
+        goto parseEffect_outOfMemory;
+    memset(retval->objects, '\0', siz);
 
     /* Parse effect parameters */
     retval->param_count = numparams;
@@ -656,20 +663,20 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
         goto parseEffect_unexpectedEOF;
 
     /* Parse object counts */
-    const int numstrings = readui32(&ptr, &len);
-    const int numobjects = readui32(&ptr, &len);
+    const int numsmallobjects = readui32(&ptr, &len);
+    const int numlargeobjects = readui32(&ptr, &len);
 
-    /* Parse effect string table */
-    retval->string_count = numstrings;
-    readstrings(numstrings, &ptr, &len, &retval->strings, m, d);
+    /* Parse "small" object table */
+    readsmallobjects(numsmallobjects, &ptr, &len,
+                     &retval->objects,
+                     profile, swiz, swizcount, smap, smapcount,
+                     m, f, d);
 
-    /* Parse effect "object" table.
-     * Objects include anything that's not a sampler, string, or scalar.
-     */
-    retval->object_count = numobjects;
-    readobjects(numobjects, &ptr, &len, &retval->objects,
-                profile, swiz, swizcount, smap, smapcount,
-                m, f, d);
+    /* Parse "large" object table. */
+    readlargeobjects(numlargeobjects, numsmallobjects, &ptr, &len,
+                     &retval->objects,
+                     profile, swiz, swizcount, smap, smapcount,
+                     m, f, d);
 
     /* Store MojoShader profile in effect structure */
     retval->profile = (char *) m(strlen(profile) + 1, d);
@@ -759,15 +766,6 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     } // for
     f((void *) effect->techniques, d);
 
-    /* Free string table */
-    for (i = 0; i < effect->string_count; i++)
-    {
-        MOJOSHADER_effectString *string = &effect->strings[i];
-        if (string->string != NULL)
-            f((void *) string->string, d);
-    } // for
-    f((void *) effect->strings, d);
-
     /* Free object table */
     for (i = 0; i < effect->object_count; i++)
     {
@@ -776,6 +774,8 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
             MOJOSHADER_freeParseData(object->shader.shader);
         else if (object->type == MOJOSHADER_OBJECTTYPE_MAPPING)
             f((void *) object->mapping.name, d);
+        else if (object->type == MOJOSHADER_OBJECTTYPE_STRING)
+            f((void *) object->string.string, d);
     } // for
     f((void *) effect->objects, d);
 

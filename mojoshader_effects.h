@@ -306,6 +306,8 @@ typedef enum MOJOSHADER_textureFilterType
     MOJOSHADER_TEXTUREFILTER_CONVOLUTIONMONO
 } MOJOSHADER_textureFilterType;
 
+/* Effect value types... */
+
 typedef struct MOJOSHADER_effectSamplerState MOJOSHADER_effectSamplerState;
 
 typedef struct MOJOSHADER_effectValue
@@ -361,6 +363,8 @@ struct MOJOSHADER_effectSamplerState
 
 typedef MOJOSHADER_effectValue MOJOSHADER_effectAnnotation;
 
+/* Effect interface structures... */
+
 typedef struct MOJOSHADER_effectParam
 {
     MOJOSHADER_effectValue value;
@@ -386,16 +390,14 @@ typedef struct MOJOSHADER_effectTechnique
     MOJOSHADER_effectAnnotation* annotations;
 } MOJOSHADER_effectTechnique;
 
-typedef struct MOJOSHADER_effectString
-{
-    unsigned int index;
-    const char *string;
-} MOJOSHADER_effectString;
+/* Effect "objects"... */
 
 typedef enum MOJOSHADER_effectObjectType
 {
     MOJOSHADER_OBJECTTYPE_SHADER,
-    MOJOSHADER_OBJECTTYPE_MAPPING
+    MOJOSHADER_OBJECTTYPE_MAPPING,
+    MOJOSHADER_OBJECTTYPE_STRING,
+    MOJOSHADER_OBJECTTYPE_TEXTURE
 } MOJOSHADER_effectObjectType;
 
 typedef struct MOJOSHADER_effectShader
@@ -413,11 +415,27 @@ typedef struct MOJOSHADER_effectMapping
     const char *name;
 } MOJOSHADER_effectMapping;
 
+typedef struct MOJOSHADER_effectString
+{
+    MOJOSHADER_effectObjectType type;
+    unsigned int index;
+    const char *string;
+} MOJOSHADER_effectString;
+
+typedef struct MOJOSHADER_effectTexture
+{
+    MOJOSHADER_effectObjectType type;
+    unsigned int index;
+    unsigned int tex_register;
+} MOJOSHADER_effectTexture;
+
 typedef union MOJOSHADER_effectObject
 {
     MOJOSHADER_effectObjectType type;
     MOJOSHADER_effectShader shader;
     MOJOSHADER_effectMapping mapping;
+    MOJOSHADER_effectString string;
+    MOJOSHADER_effectTexture texture;
 } MOJOSHADER_effectObject;
 
 /*
@@ -467,18 +485,6 @@ typedef struct MOJOSHADER_effect
      * This can be NULL on error or if (technique_count) is zero.
      */
     MOJOSHADER_effectTechnique *techniques;
-
-    /*
-     * The number of strings pointed to by (strings).
-     */
-    int string_count;
-
-    /*
-     * (string_count) elemends of data that specify strings used in
-     *  this effect.
-     * This can be NULL on error or if (string_count) is zero.
-     */
-    MOJOSHADER_effectString *strings;
 
     /*
      * The number of elements pointed to by (objects).
