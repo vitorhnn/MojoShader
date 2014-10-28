@@ -12,6 +12,8 @@
 
 #ifdef MOJOSHADER_EFFECT_SUPPORT
 
+/* MOJOSHADER_effectState types... */
+
 typedef enum MOJOSHADER_renderStateType
 {
     /* Note that we are NOT using the actual RS values from D3D here.
@@ -260,36 +262,7 @@ typedef enum MOJOSHADER_degreeType
     MOJOSHADER_DEGREE_QUINTIC   = 5
 } MOJOSHADER_degreeType;
 
-typedef struct MOJOSHADER_effectState
-{
-    MOJOSHADER_renderStateType type;
-    const char *name;
-    const char *semantic;
-    unsigned int element_count;
-    unsigned int row_count;
-    unsigned int column_count;
-    MOJOSHADER_symbolClass state_class;
-    MOJOSHADER_symbolType state_type;
-    unsigned int value_count;
-    union
-    {
-        void                           *values; /* Raw value */
-        MOJOSHADER_zBufferType         *valuesZBT;
-        MOJOSHADER_fillMode            *valuesFiM;
-        MOJOSHADER_shadeMode           *valuesSM;
-        MOJOSHADER_blendMode           *valuesBM;
-        MOJOSHADER_cullMode            *valuesCM;
-        MOJOSHADER_compareFunc         *valuesCF;
-        MOJOSHADER_fogMode             *valuesFoM;
-        MOJOSHADER_stencilOp           *valuesSO;
-        MOJOSHADER_materialColorSource *valuesMCS;
-        MOJOSHADER_vertexBlendFlags    *valuesVBF;
-        MOJOSHADER_patchedEdgeStyle    *valuesPES;
-        MOJOSHADER_debugMonitorTokens  *valuesDMT;
-        MOJOSHADER_blendOp             *valuesBO;
-        MOJOSHADER_degreeType          *valuesDT;
-    };
-} MOJOSHADER_effectState;
+/* MOJOSHADER_effectSamplerState types... */
 
 typedef enum MOJOSHADER_samplerStateType
 {
@@ -333,53 +306,66 @@ typedef enum MOJOSHADER_textureFilterType
     MOJOSHADER_TEXTUREFILTER_CONVOLUTIONMONO
 } MOJOSHADER_textureFilterType;
 
-typedef struct MOJOSHADER_effectSamplerState
+typedef struct MOJOSHADER_effectSamplerState MOJOSHADER_effectSamplerState;
+
+typedef struct MOJOSHADER_effectValue
 {
-    MOJOSHADER_samplerStateType type;
     const char *name;
     const char *semantic;
     unsigned int element_count;
     unsigned int row_count;
     unsigned int column_count;
-    MOJOSHADER_symbolClass state_class;
-    MOJOSHADER_symbolType state_type;
+    MOJOSHADER_symbolClass value_class;
+    MOJOSHADER_symbolType value_type;
     unsigned int value_count;
     union
     {
-        void                         *values; /* Raw value */
-        unsigned int                 *valuesI;
-        float                        *valuesF;
-        MOJOSHADER_textureAddress    *valuesTA;
-        MOJOSHADER_textureFilterType *valuesTFT;
+         /* Raw value types */
+        void                           *values;
+        unsigned int                   *valuesI;
+        float                          *valuesF;
+        /* As used by MOJOSHADER_effectState */
+        MOJOSHADER_zBufferType         *valuesZBT;
+        MOJOSHADER_fillMode            *valuesFiM;
+        MOJOSHADER_shadeMode           *valuesSM;
+        MOJOSHADER_blendMode           *valuesBM;
+        MOJOSHADER_cullMode            *valuesCM;
+        MOJOSHADER_compareFunc         *valuesCF;
+        MOJOSHADER_fogMode             *valuesFoM;
+        MOJOSHADER_stencilOp           *valuesSO;
+        MOJOSHADER_materialColorSource *valuesMCS;
+        MOJOSHADER_vertexBlendFlags    *valuesVBF;
+        MOJOSHADER_patchedEdgeStyle    *valuesPES;
+        MOJOSHADER_debugMonitorTokens  *valuesDMT;
+        MOJOSHADER_blendOp             *valuesBO;
+        MOJOSHADER_degreeType          *valuesDT;
+        /* As used by MOJOSHADER_effectSamplerState */
+        MOJOSHADER_textureAddress      *valuesTA;
+        MOJOSHADER_textureFilterType   *valuesTFT;
+        /* As used by MOJOSHADER_effectParameter */
+        MOJOSHADER_effectSamplerState  *valuesSS;
     };
-} MOJOSHADER_effectSamplerState;
+} MOJOSHADER_effectValue;
 
-typedef struct MOJOSHADER_effectAnnotation
+typedef struct MOJOSHADER_effectState
 {
-    const char *name;
-    const char *semantic;
-    unsigned int element_count;
-    unsigned int row_count;
-    unsigned int column_count;
-    MOJOSHADER_symbolClass anno_class;
-    MOJOSHADER_symbolType anno_type;
-    unsigned int value_count;
-    void *values;
-} MOJOSHADER_effectAnnotation;
+    MOJOSHADER_renderStateType type;
+    MOJOSHADER_effectValue value;
+} MOJOSHADER_effectState;
+
+struct MOJOSHADER_effectSamplerState
+{
+    MOJOSHADER_samplerStateType type;
+    MOJOSHADER_effectValue value;
+};
+
+typedef MOJOSHADER_effectValue MOJOSHADER_effectAnnotation;
 
 typedef struct MOJOSHADER_effectParam
 {
-    const char *name;
-    const char *semantic;
-    unsigned int element_count;
-    unsigned int row_count;
-    unsigned int column_count;
-    MOJOSHADER_symbolClass param_class;
-    MOJOSHADER_symbolType param_type;
-    unsigned int value_count;
-    void *values;
+    MOJOSHADER_effectValue value;
     unsigned int annotation_count;
-    MOJOSHADER_effectAnnotation* annotations;
+    MOJOSHADER_effectAnnotation *annotations;
 } MOJOSHADER_effectParam;
 
 typedef struct MOJOSHADER_effectPass

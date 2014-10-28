@@ -221,20 +221,13 @@ static char *readstring(const uint8 *base,
 static void readvalue(const uint8 *base,
                       const uint32 typeoffset,
                       const uint32 valoffset,
-                      MOJOSHADER_symbolType *val_type,
-                      MOJOSHADER_symbolClass *val_class,
-                      const char **val_name,
-                      const char **val_semantic,
-                      uint32 *val_element_count,
-                      uint32 *val_row_count,
-                      uint32 *val_column_count,
-                      uint32 *val_value_count,
-                      void **val_values,
+                      MOJOSHADER_effectValue *value,
                       MOJOSHADER_malloc m,
                       void *d)
 {
     int i;
     const uint8 *typeptr = base + typeoffset;
+    const uint8 *valptr = base + valoffset;
     unsigned int typelen = 9999999;  // !!! FIXME
     const uint32 type = readui32(&typeptr, &typelen);
     const uint32 class = readui32(&typeptr, &typelen);
@@ -242,11 +235,11 @@ static void readvalue(const uint8 *base,
     const uint32 semantic = readui32(&typeptr, &typelen);
     const uint32 numelements = readui32(&typeptr, &typelen);
 
-    *val_type = (MOJOSHADER_symbolType) type;
-    *val_class = (MOJOSHADER_symbolClass) class;
-    *val_name = readstring(base, name, m, d);
-    *val_semantic = readstring(base, semantic, m, d);
-    *val_element_count = numelements;
+    value->value_type = (MOJOSHADER_symbolType) type;
+    value->value_class = (MOJOSHADER_symbolClass) class;
+    value->name = readstring(base, name, m, d);
+    value->semantic = readstring(base, semantic, m, d);
+    value->element_count = numelements;
 
     /* Class sanity check */
     assert(class >= MOJOSHADER_SYMCLASS_SCALAR && class <= MOJOSHADER_SYMCLASS_STRUCT);
@@ -262,23 +255,22 @@ static void readvalue(const uint8 *base,
         const uint32 columncount = readui32(&typeptr, &typelen);
         const uint32 rowcount = readui32(&typeptr, &typelen);
 
-        *val_column_count = columncount;
-        *val_row_count = rowcount;
+        value->column_count = columncount;
+        value->row_count = rowcount;
 
         uint32 siz = columncount * rowcount;
         if (numelements > 0)
             siz *= numelements;
-        *val_value_count = siz;
+        value->value_count = siz;
         siz *= 4;
-        *val_values = m(siz, d);
-        memcpy(*val_values, base + valoffset, siz);
+        value->values = m(siz, d);
+        memcpy(value->values, valptr, siz);
     } // if
     else if (class == MOJOSHADER_SYMCLASS_OBJECT)
     {
         /* This class contains either samplers or "objects" */
         assert(type >= MOJOSHADER_SYMTYPE_STRING && type <= MOJOSHADER_SYMTYPE_VERTEXSHADER);
 
-        const uint8 *valptr = base + valoffset;
         unsigned int vallen = 9999999; // !!! FIXME
 
         if (type == MOJOSHADER_SYMTYPE_SAMPLER
@@ -289,16 +281,15 @@ static void readvalue(const uint8 *base,
         {
             const uint32 numstates = readui32(&valptr, &vallen);
 
-            *val_value_count = numstates;
+            value->value_count = numstates;
 
             const uint32 siz = sizeof(MOJOSHADER_effectSamplerState) * numstates;
-            *val_values = m(siz, d);
-            memset(*val_values, '\0', siz);
+            value->values = m(siz, d);
+            memset(value->values, '\0', siz);
 
-            MOJOSHADER_effectSamplerState *states = (MOJOSHADER_effectSamplerState *) *val_values;
             for (i = 0; i < numstates; i++)
             {
-                MOJOSHADER_effectSamplerState *state = &states[i];
+                MOJOSHADER_effectSamplerState *state = &value->valuesSS[i];
                 const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
                 /*const uint32 FIXME =*/ readui32(&valptr, &vallen);
                 const uint32 statetypeoffset = readui32(&valptr, &vallen);
@@ -306,10 +297,7 @@ static void readvalue(const uint8 *base,
 
                 state->type = (MOJOSHADER_samplerStateType) type;
                 readvalue(base, statetypeoffset, statevaloffset,
-                          &state->state_type, &state->state_class,
-                          &state->name, &state->semantic, // FIXME: May need to be freed!
-                          &state->element_count, &state->row_count, &state->column_count,
-                          &state->value_count, &state->values,
+                          &state->value,
                           m, d);
             } // for
         } // if
@@ -319,11 +307,11 @@ static void readvalue(const uint8 *base,
             if (numelements > 0)
                 numobjects = numelements;
 
-            *val_value_count = numobjects;
+            value->value_count = numobjects;
 
             const uint32 siz = 4 * numobjects;
-            *val_values = m(siz, d);
-            memcpy(*val_values, base + valoffset, siz);
+            value->values = m(siz, d);
+            memcpy(value->values, valptr, siz);
         } // else
     } // else if
     else if (class == MOJOSHADER_SYMCLASS_STRUCT)
@@ -355,10 +343,7 @@ static void readannotations(const uint32 numannos,
         const uint32 valoffset = readui32(ptr, len);
 
         readvalue(base, typeoffset, valoffset,
-                  &anno->anno_type, &anno->anno_class,
-                  &anno->name, &anno->semantic,
-                  &anno->element_count, &anno->row_count, &anno->column_count,
-                  &anno->value_count, &anno->values,
+                  anno,
                   m, d);
     } // for
 } // readannotation
@@ -391,10 +376,7 @@ static void readparameters(const uint32 numparams,
         readannotations(numannos, base, ptr, len, &param->annotations, m, d);
 
         readvalue(base, typeoffset, valoffset,
-                  &param->param_type, &param->param_class,
-                  &param->name, &param->semantic,
-                  &param->element_count, &param->row_count, &param->column_count,
-                  &param->value_count, &param->values,
+                  &param->value,
                   m, d);
 
     } // for
@@ -426,10 +408,7 @@ static void readstates(const uint32 numstates,
 
         state->type = (MOJOSHADER_renderStateType) type;
         readvalue(base, typeoffset, valoffset,
-                  &state->state_type, &state->state_class,
-                  &state->name, &state->semantic,
-                  &state->element_count, &state->row_count, &state->column_count,
-                  &state->value_count, &state->values,
+                  &state->value,
                   m, d);
     } // for
 } // readstates
@@ -710,6 +689,14 @@ parseEffect_outOfMemory:
 } // MOJOSHADER_parseEffect
 
 
+void freevalue(MOJOSHADER_effectValue *value, MOJOSHADER_free f, void *d)
+{
+    f((void *) value->name, d);
+    f((void *) value->semantic, d);
+    f(value->values, d);
+} // freevalue
+
+
 void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
 {
     MOJOSHADER_effect *effect = (MOJOSHADER_effect *) _effect;
@@ -735,15 +722,10 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     for (i = 0; i < effect->param_count; i++)
     {
         MOJOSHADER_effectParam *param = &effect->params[i];
-        f((void *) param->name, d);
-        f((void *) param->semantic, d);
-        f(param->values, d);
+        freevalue(&param->value, f, d);
         for (j = 0; j < param->annotation_count; j++)
         {
-            MOJOSHADER_effectAnnotation *anno = &param->annotations[j];
-            f((void *) anno->name, d);
-            f((void *) anno->semantic, d);
-            f(anno->values, d);
+            freevalue(&param->annotations[j], f, d);
         } // for
         f((void *) param->annotations, d);
     } // for
@@ -760,27 +742,19 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
             f((void *) pass->name, d);
             for (k = 0; k < pass->state_count; k++)
             {
-                MOJOSHADER_effectState *state = &pass->states[k];
-                f((void *) state->name, d);
-                f((void *) state->semantic, d);
-                f(state->values, d);
+                freevalue(&pass->states[k].value, f, d);
             } // for
             f((void *) pass->states, d);
             for (k = 0; k < pass->annotation_count; k++)
             {
-                MOJOSHADER_effectAnnotation *anno = &pass->annotations[k];
-                f((void *) anno->name, d);
-                f((void *) anno->semantic, d);
-                f(anno->values, d);
+                freevalue(&pass->annotations[k], f, d);
             } // for
             f((void *) pass->annotations, d);
         } // for
         f((void *) technique->passes, d);
         for (j = 0; j < technique->annotation_count; j++)
         {
-            f((void *) technique->annotations[j].name, d);
-            f((void *) technique->annotations[j].semantic, d);
-            f(technique->annotations[j].values, d);
+            freevalue(&technique->annotations[j], f, d);
         } // for
         f((void *) technique->annotations, d);
     } // for
