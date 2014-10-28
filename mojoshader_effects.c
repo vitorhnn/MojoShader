@@ -616,9 +616,6 @@ static void readlargeobjects(const uint32 numlargeobjects,
                                                      m, f, d);
 
             // !!! FIXME: check for errors.
-
-            *ptr += length;
-            *len -= length;
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
@@ -633,16 +630,16 @@ static void readlargeobjects(const uint32 numlargeobjects,
                 memcpy(str, *ptr, length);
                 object->mapping.name = str;
             } // if
-
-            /* String block is always a multiple of four */
-            const uint32 blocklen = (length + 3) - ((length - 1) % 4);
-            *ptr += blocklen;
-            *len -= blocklen;
         } // else if
         else
         {
             assert(0 && "Large object type unknown!");
         } // else
+
+        /* Object block is always a multiple of four */
+        const uint32 blocklen = (length + 3) - ((length - 1) % 4);
+        *ptr += blocklen;
+        *len -= blocklen;
     } // for
 } // readobjects
 
