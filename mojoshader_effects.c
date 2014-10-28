@@ -577,7 +577,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                              const uint32 numsmallobjects,
                              const uint8 **ptr,
                              uint32 *len,
-                             MOJOSHADER_effectObject *objects,
+                             MOJOSHADER_effect *effect,
                              const char *profile,
                              const MOJOSHADER_swizzle *swiz,
                              const unsigned int swizcount,
@@ -593,20 +593,29 @@ static void readlargeobjects(const uint32 numlargeobjects,
     int numobjects = numsmallobjects + numlargeobjects + 1;
     for (i = numsmallobjects + 1; i < numobjects; i++)
     {
-        MOJOSHADER_effectObject *object = &objects[i];
-
         const uint32 technique = readui32(ptr, len);
-        const uint32 pass = readui32(ptr, len);
+        const uint32 index = readui32(ptr, len);
         /*const uint32 FIXME =*/ readui32(ptr, len);
-        /*const uint32 state =*/ readui32(ptr, len);
+        const uint32 state = readui32(ptr, len);
         /*const uint32 type =*/ readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
+        uint32 objectIndex;
+        if (technique == -1)
+        {
+            objectIndex = effect->params[index].value.valuesSS[state].value.valuesI[0];
+        } // if
+        else
+        {
+            objectIndex = effect->techniques[technique].passes[index].states[state].value.valuesI[0];
+        } // else
+
+        MOJOSHADER_effectObject *object = &effect->objects[objectIndex];
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
             object->shader.technique = technique;
-            object->shader.pass = pass;
+            object->shader.pass = index;
             object->shader.shader = MOJOSHADER_parse(profile, *ptr, length,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
@@ -732,7 +741,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
     /* Parse "large" object table. */
     readlargeobjects(numlargeobjects, numsmallobjects, &ptr, &len,
-                     retval->objects,
+                     retval,
                      profile, swiz, swizcount, smap, smapcount,
                      m, f, d);
 
