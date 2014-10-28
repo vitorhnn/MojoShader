@@ -517,14 +517,12 @@ static void readsmallobjects(const uint32 numsmallobjects,
 
     for (i = 1; i < numsmallobjects + 1; i++)
     {
-        MOJOSHADER_effectObject *object = &objects[i];
-
         const uint32 index = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
+        MOJOSHADER_effectObject *object = &objects[index];
         if (object->type == MOJOSHADER_SYMTYPE_STRING)
         {
-            object->string.index = index;
             if (length > 0)
             {
                 char *str = (char *) m(length, d);
@@ -538,7 +536,6 @@ static void readsmallobjects(const uint32 numsmallobjects,
               || object->type == MOJOSHADER_SYMTYPE_TEXTURE3D
               || object->type == MOJOSHADER_SYMTYPE_TEXTURECUBE)
         {
-            object->texture.index = index;
             object->texture.tex_register = *((uint32 *) *ptr);
         } // else if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
@@ -547,7 +544,6 @@ static void readsmallobjects(const uint32 numsmallobjects,
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER3D
               || object->type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
         {
-            object->mapping.param = index;
             if (length > 0)
             {
                 char *str = (char *) m(length, d);
@@ -600,9 +596,9 @@ static void readlargeobjects(const uint32 numlargeobjects,
         MOJOSHADER_effectObject *object = &objects[i];
 
         const uint32 technique = readui32(ptr, len);
-        const uint32 index = readui32(ptr, len);
+        const uint32 pass = readui32(ptr, len);
         /*const uint32 FIXME =*/ readui32(ptr, len);
-        const uint32 state = readui32(ptr, len);
+        /*const uint32 state =*/ readui32(ptr, len);
         /*const uint32 type =*/ readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
@@ -610,7 +606,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
             object->shader.technique = technique;
-            object->shader.pass = index;
+            object->shader.pass = pass;
             object->shader.shader = MOJOSHADER_parse(profile, *ptr, length,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
@@ -623,7 +619,6 @@ static void readlargeobjects(const uint32 numlargeobjects,
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER3D
               || object->type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
         {
-            object->mapping.param = index;
             if (length > 0)
             {
                 char *str = (char *) m(length, d);

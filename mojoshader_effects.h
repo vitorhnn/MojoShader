@@ -403,21 +403,18 @@ typedef struct MOJOSHADER_effectShader
 typedef struct MOJOSHADER_effectSamplerMap
 {
     MOJOSHADER_symbolType type;
-    unsigned int param;
     const char *name;
 } MOJOSHADER_effectSamplerMap;
 
 typedef struct MOJOSHADER_effectString
 {
     MOJOSHADER_symbolType type;
-    unsigned int index;
     const char *string;
 } MOJOSHADER_effectString;
 
 typedef struct MOJOSHADER_effectTexture
 {
     MOJOSHADER_symbolType type;
-    unsigned int index;
     unsigned int tex_register;
 } MOJOSHADER_effectTexture;
 
