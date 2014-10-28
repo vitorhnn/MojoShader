@@ -602,13 +602,9 @@ static void readlargeobjects(const uint32 numlargeobjects,
 
         uint32 objectIndex;
         if (technique == -1)
-        {
             objectIndex = effect->params[index].value.valuesSS[state].value.valuesI[0];
-        } // if
         else
-        {
             objectIndex = effect->techniques[technique].passes[index].states[state].value.valuesI[0];
-        } // else
 
         MOJOSHADER_effectObject *object = &effect->objects[objectIndex];
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
