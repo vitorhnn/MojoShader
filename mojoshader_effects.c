@@ -271,14 +271,13 @@ static void readvalue(const uint8 *base,
         /* This class contains either samplers or "objects" */
         assert(type >= MOJOSHADER_SYMTYPE_STRING && type <= MOJOSHADER_SYMTYPE_VERTEXSHADER);
 
-        unsigned int vallen = 9999999; // !!! FIXME
-
         if (type == MOJOSHADER_SYMTYPE_SAMPLER
          || type == MOJOSHADER_SYMTYPE_SAMPLER1D
          || type == MOJOSHADER_SYMTYPE_SAMPLER2D
          || type == MOJOSHADER_SYMTYPE_SAMPLER3D
          || type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
         {
+            unsigned int vallen = 9999999; // !!! FIXME
             const uint32 numstates = readui32(&valptr, &vallen);
 
             value->value_count = numstates;
