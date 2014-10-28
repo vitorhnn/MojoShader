@@ -263,23 +263,31 @@ typedef enum MOJOSHADER_degreeType
 typedef struct MOJOSHADER_effectState
 {
     MOJOSHADER_renderStateType type;
+    const char *name;
+    const char *semantic;
+    unsigned int element_count;
+    unsigned int row_count;
+    unsigned int column_count;
+    MOJOSHADER_symbolClass state_class;
+    MOJOSHADER_symbolType state_type;
+    unsigned int value_count;
     union
     {
-        unsigned int                   value; /* Raw value */
-        MOJOSHADER_zBufferType         valueZBT;
-        MOJOSHADER_fillMode            valueFiM;
-        MOJOSHADER_shadeMode           valueSM;
-        MOJOSHADER_blendMode           valueBM;
-        MOJOSHADER_cullMode            valueCM;
-        MOJOSHADER_compareFunc         valueCF;
-        MOJOSHADER_fogMode             valueFoM;
-        MOJOSHADER_stencilOp           valueSO;
-        MOJOSHADER_materialColorSource valueMCS;
-        MOJOSHADER_vertexBlendFlags    valueVBF;
-        MOJOSHADER_patchedEdgeStyle    valuePES;
-        MOJOSHADER_debugMonitorTokens  valueDMT;
-        MOJOSHADER_blendOp             valueBO;
-        MOJOSHADER_degreeType          valueDT;
+        void                           *values; /* Raw value */
+        MOJOSHADER_zBufferType         *valuesZBT;
+        MOJOSHADER_fillMode            *valuesFiM;
+        MOJOSHADER_shadeMode           *valuesSM;
+        MOJOSHADER_blendMode           *valuesBM;
+        MOJOSHADER_cullMode            *valuesCM;
+        MOJOSHADER_compareFunc         *valuesCF;
+        MOJOSHADER_fogMode             *valuesFoM;
+        MOJOSHADER_stencilOp           *valuesSO;
+        MOJOSHADER_materialColorSource *valuesMCS;
+        MOJOSHADER_vertexBlendFlags    *valuesVBF;
+        MOJOSHADER_patchedEdgeStyle    *valuesPES;
+        MOJOSHADER_debugMonitorTokens  *valuesDMT;
+        MOJOSHADER_blendOp             *valuesBO;
+        MOJOSHADER_degreeType          *valuesDT;
     };
 } MOJOSHADER_effectState;
 

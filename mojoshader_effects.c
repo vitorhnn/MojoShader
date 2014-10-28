@@ -419,11 +419,16 @@ static void readstates(const uint32 numstates,
 
         const uint32 type = readui32(ptr, len);
         /*const uint32 FIXME =*/ readui32(ptr, len);
-        /*const uint32 offsetend =*/ readui32(ptr, len);
-        const uint32 offsetstart = readui32(ptr, len);
+        const uint32 typeoffset = readui32(ptr, len);
+        const uint32 valoffset = readui32(ptr, len);
 
         state->type = (MOJOSHADER_renderStateType) type;
-        state->value = *((uint32 *) (((uint8 *) base) + offsetstart));
+        readvalue(base, typeoffset, valoffset,
+                  &state->state_type, &state->state_class,
+                  &state->name, &state->semantic,
+                  &state->element_count, &state->row_count, &state->column_count,
+                  &state->value_count, &state->values,
+                  m, d);
     } // for
 } // readstates
 
