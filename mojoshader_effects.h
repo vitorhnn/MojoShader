@@ -424,10 +424,13 @@ typedef struct MOJOSHADER_effectTexture
 typedef union MOJOSHADER_effectObject
 {
     MOJOSHADER_symbolType type;
-    MOJOSHADER_effectShader shader;
-    MOJOSHADER_effectSamplerMap mapping;
-    MOJOSHADER_effectString string;
-    MOJOSHADER_effectTexture texture;
+    union
+    {
+        MOJOSHADER_effectShader shader;
+        MOJOSHADER_effectSamplerMap mapping;
+        MOJOSHADER_effectString string;
+        MOJOSHADER_effectTexture texture;
+    };
 } MOJOSHADER_effectObject;
 
 /*
