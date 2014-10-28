@@ -222,6 +222,7 @@ static void readvalue(const uint8 *base,
                       const uint32 typeoffset,
                       const uint32 valoffset,
                       MOJOSHADER_effectValue *value,
+                      MOJOSHADER_effectObject *objects,
                       MOJOSHADER_malloc m,
                       void *d)
 {
@@ -289,15 +290,17 @@ static void readvalue(const uint8 *base,
             for (i = 0; i < numstates; i++)
             {
                 MOJOSHADER_effectSamplerState *state = &value->valuesSS[i];
-                const uint32 type = readui32(&valptr, &vallen) & ~0xA0;
+                const uint32 stype = readui32(&valptr, &vallen) & ~0xA0;
                 /*const uint32 FIXME =*/ readui32(&valptr, &vallen);
                 const uint32 statetypeoffset = readui32(&valptr, &vallen);
                 const uint32 statevaloffset = readui32(&valptr, &vallen);
 
-                state->type = (MOJOSHADER_samplerStateType) type;
+                state->type = (MOJOSHADER_samplerStateType) stype;
                 readvalue(base, statetypeoffset, statevaloffset,
-                          &state->value,
+                          &state->value, objects,
                           m, d);
+                if (stype == MOJOSHADER_SAMP_TEXTURE)
+                    objects[state->value.valuesI[0]].type = type;
             } // for
         } // if
         else
@@ -311,6 +314,9 @@ static void readvalue(const uint8 *base,
             const uint32 siz = 4 * numobjects;
             value->values = m(siz, d);
             memcpy(value->values, valptr, siz);
+
+            for (i = 0; i < value->value_count; i++)
+                objects[value->valuesI[i]].type = type;
         } // else
     } // else if
     else if (class == MOJOSHADER_SYMCLASS_STRUCT)
@@ -324,6 +330,7 @@ static void readannotations(const uint32 numannos,
                             const uint8 **ptr,
                             uint32 *len,
                             MOJOSHADER_effectAnnotation **annotations,
+                            MOJOSHADER_effectObject *objects,
                             MOJOSHADER_malloc m,
                             void *d)
 {
@@ -342,7 +349,7 @@ static void readannotations(const uint32 numannos,
         const uint32 valoffset = readui32(ptr, len);
 
         readvalue(base, typeoffset, valoffset,
-                  anno,
+                  anno, objects,
                   m, d);
     } // for
 } // readannotation
@@ -352,6 +359,7 @@ static void readparameters(const uint32 numparams,
                            const uint8 **ptr,
                            uint32 *len,
                            MOJOSHADER_effectParam **params,
+                           MOJOSHADER_effectObject *objects,
                            MOJOSHADER_malloc m,
                            void *d)
 {
@@ -372,10 +380,12 @@ static void readparameters(const uint32 numparams,
         const uint32 numannos = readui32(ptr, len);
 
         param->annotation_count = numannos;
-        readannotations(numannos, base, ptr, len, &param->annotations, m, d);
+        readannotations(numannos, base, ptr, len,
+                        &param->annotations, objects,
+                        m, d);
 
         readvalue(base, typeoffset, valoffset,
-                  &param->value,
+                  &param->value, objects,
                   m, d);
 
     } // for
@@ -386,6 +396,7 @@ static void readstates(const uint32 numstates,
                        const uint8 **ptr,
                        uint32 *len,
                        MOJOSHADER_effectState **states,
+                       MOJOSHADER_effectObject *objects,
                        MOJOSHADER_malloc m,
                        void *d)
 {
@@ -407,7 +418,7 @@ static void readstates(const uint32 numstates,
 
         state->type = (MOJOSHADER_renderStateType) type;
         readvalue(base, typeoffset, valoffset,
-                  &state->value,
+                  &state->value, objects,
                   m, d);
     } // for
 } // readstates
@@ -417,6 +428,7 @@ static void readpasses(const uint32 numpasses,
                        const uint8 **ptr,
                        uint32 *len,
                        MOJOSHADER_effectPass **passes,
+                       MOJOSHADER_effectObject *objects,
                        MOJOSHADER_malloc m,
                        void *d)
 {
@@ -438,10 +450,14 @@ static void readpasses(const uint32 numpasses,
         pass->name = readstring(base, passnameoffset, m, d);
 
         pass->annotation_count = numannos;
-        readannotations(numannos, base, ptr, len, &pass->annotations, m, d);
+        readannotations(numannos, base, ptr, len,
+                        &pass->annotations, objects,
+                        m, d);
 
         pass->state_count = numstates;
-        readstates(numstates, base, ptr, len, &pass->states, m, d);
+        readstates(numstates, base, ptr, len,
+                   &pass->states, objects,
+                   m, d);
     } // for
 } // readpasses
 
@@ -450,6 +466,7 @@ static void readtechniques(const uint32 numtechniques,
                            const uint8 **ptr,
                            uint32 *len,
                            MOJOSHADER_effectTechnique **techniques,
+                           MOJOSHADER_effectObject *objects,
                            MOJOSHADER_malloc m,
                            void *d)
 {
@@ -471,17 +488,21 @@ static void readtechniques(const uint32 numtechniques,
         technique->name = readstring(base, nameoffset, m, d);
 
         technique->annotation_count = numannos;
-        readannotations(numannos, base, ptr, len, &technique->annotations, m, d);
+        readannotations(numannos, base, ptr, len,
+                        &technique->annotations, objects,
+                        m, d);
 
         technique->pass_count = numpasses;
-        readpasses(numpasses, base, ptr, len, &technique->passes, m, d);
+        readpasses(numpasses, base, ptr, len,
+                   &technique->passes, objects,
+                   m, d);
     } // for
 } // readtechniques
 
 static void readsmallobjects(const uint32 numsmallobjects,
                              const uint8 **ptr,
                              uint32 *len,
-                             MOJOSHADER_effectObject **objects,
+                             MOJOSHADER_effectObject *objects,
                              const char *profile,
                              const MOJOSHADER_swizzle *swiz,
                              const unsigned int swizcount,
@@ -496,8 +517,8 @@ static void readsmallobjects(const uint32 numsmallobjects,
 
     for (i = 1; i < numsmallobjects + 1; i++)
     {
-        (*objects)[i].type = MOJOSHADER_SYMTYPE_STRING;
-        MOJOSHADER_effectString *string = &(*objects)[i].string;
+        objects[i].type = MOJOSHADER_SYMTYPE_STRING;
+        MOJOSHADER_effectString *string = &objects[i].string;
 
         const uint32 index = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
@@ -521,7 +542,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                              const uint32 numsmallobjects,
                              const uint8 **ptr,
                              uint32 *len,
-                             MOJOSHADER_effectObject **objects,
+                             MOJOSHADER_effectObject *objects,
                              const char *profile,
                              const MOJOSHADER_swizzle *swiz,
                              const unsigned int swizcount,
@@ -537,7 +558,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
     int numobjects = numsmallobjects + numlargeobjects + 1;
     for (i = numsmallobjects + 1; i < numobjects; i++)
     {
-        MOJOSHADER_effectObject *object = &(*objects)[i];
+        MOJOSHADER_effectObject *object = &objects[i];
 
         const uint32 technique = readui32(ptr, len);
         const uint32 index = readui32(ptr, len);
@@ -654,11 +675,15 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
     /* Parse effect parameters */
     retval->param_count = numparams;
-    readparameters(numparams, base, &ptr, &len, &retval->params, m, d);
+    readparameters(numparams, base, &ptr, &len,
+                   &retval->params, retval->objects,
+                   m, d);
 
     /* Parse effect techniques */
     retval->technique_count = numtechniques;
-    readtechniques(numtechniques, base, &ptr, &len, &retval->techniques, m, d);
+    readtechniques(numtechniques, base, &ptr, &len,
+                   &retval->techniques, retval->objects,
+                   m, d);
 
     if (len < 8)
         goto parseEffect_unexpectedEOF;
@@ -669,13 +694,13 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
     /* Parse "small" object table */
     readsmallobjects(numsmallobjects, &ptr, &len,
-                     &retval->objects,
+                     retval->objects,
                      profile, swiz, swizcount, smap, smapcount,
                      m, f, d);
 
     /* Parse "large" object table. */
     readlargeobjects(numlargeobjects, numsmallobjects, &ptr, &len,
-                     &retval->objects,
+                     retval->objects,
                      profile, swiz, swizcount, smap, smapcount,
                      m, f, d);
 
