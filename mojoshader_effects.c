@@ -496,6 +496,7 @@ static void readsmallobjects(const uint32 numsmallobjects,
 
     for (i = 1; i < numsmallobjects + 1; i++)
     {
+        (*objects)[i].type = MOJOSHADER_SYMTYPE_STRING;
         MOJOSHADER_effectString *string = &(*objects)[i].string;
 
         const uint32 index = readui32(ptr, len);
@@ -551,7 +552,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
         {
             const uint32 shadersize = readui32(ptr, len);
 
-            object->type = MOJOSHADER_OBJECTTYPE_SHADER;
+            object->type = MOJOSHADER_SYMTYPE_PIXELSHADER; // Arbitrary...
             object->shader.technique = technique;
             object->shader.pass = index;
             object->shader.shader = MOJOSHADER_parse(profile, *ptr, shadersize,
@@ -567,7 +568,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
         {
             const uint32 length = readui32(ptr, len);
 
-            object->type = MOJOSHADER_OBJECTTYPE_MAPPING;
+            object->type = MOJOSHADER_SYMTYPE_SAMPLER; // Arbitrary...
             object->mapping.param = index;
             if (length > 0)
             {
@@ -770,11 +771,11 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     for (i = 0; i < effect->object_count; i++)
     {
         MOJOSHADER_effectObject *object = &effect->objects[i];
-        if (object->type == MOJOSHADER_OBJECTTYPE_SHADER)
+        if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER) // Arbitrary...
             MOJOSHADER_freeParseData(object->shader.shader);
-        else if (object->type == MOJOSHADER_OBJECTTYPE_MAPPING)
+        else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER) // Arbitrary...
             f((void *) object->mapping.name, d);
-        else if (object->type == MOJOSHADER_OBJECTTYPE_STRING)
+        else if (object->type == MOJOSHADER_SYMTYPE_STRING)
             f((void *) object->string.string, d);
     } // for
     f((void *) effect->objects, d);

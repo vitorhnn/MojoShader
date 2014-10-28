@@ -392,48 +392,40 @@ typedef struct MOJOSHADER_effectTechnique
 
 /* Effect "objects"... */
 
-typedef enum MOJOSHADER_effectObjectType
-{
-    MOJOSHADER_OBJECTTYPE_SHADER,
-    MOJOSHADER_OBJECTTYPE_MAPPING,
-    MOJOSHADER_OBJECTTYPE_STRING,
-    MOJOSHADER_OBJECTTYPE_TEXTURE
-} MOJOSHADER_effectObjectType;
-
 typedef struct MOJOSHADER_effectShader
 {
-    MOJOSHADER_effectObjectType type;
+    MOJOSHADER_symbolType type;
     unsigned int technique;
     unsigned int pass;
     const MOJOSHADER_parseData *shader;
 } MOJOSHADER_effectShader;
 
-typedef struct MOJOSHADER_effectMapping
+typedef struct MOJOSHADER_effectSamplerMap
 {
-    MOJOSHADER_effectObjectType type;
+    MOJOSHADER_symbolType type;
     unsigned int param;
     const char *name;
-} MOJOSHADER_effectMapping;
+} MOJOSHADER_effectSamplerMap;
 
 typedef struct MOJOSHADER_effectString
 {
-    MOJOSHADER_effectObjectType type;
+    MOJOSHADER_symbolType type;
     unsigned int index;
     const char *string;
 } MOJOSHADER_effectString;
 
 typedef struct MOJOSHADER_effectTexture
 {
-    MOJOSHADER_effectObjectType type;
+    MOJOSHADER_symbolType type;
     unsigned int index;
     unsigned int tex_register;
 } MOJOSHADER_effectTexture;
 
 typedef union MOJOSHADER_effectObject
 {
-    MOJOSHADER_effectObjectType type;
+    MOJOSHADER_symbolType type;
     MOJOSHADER_effectShader shader;
-    MOJOSHADER_effectMapping mapping;
+    MOJOSHADER_effectSamplerMap mapping;
     MOJOSHADER_effectString string;
     MOJOSHADER_effectTexture texture;
 } MOJOSHADER_effectObject;
