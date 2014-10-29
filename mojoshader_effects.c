@@ -10,9 +10,10 @@
 #define __MOJOSHADER_INTERNAL__ 1
 #include "mojoshader_internal.h"
 
+#if SUPPORT_PRESHADERS
+
 #include <math.h>
 
-#if SUPPORT_PRESHADERS
 void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
                              const float *inregs, float *outregs)
 {
