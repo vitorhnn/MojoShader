@@ -833,9 +833,14 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     for (i = 0; i < effect->object_count; i++)
     {
         MOJOSHADER_effectObject *object = &effect->objects[i];
-        if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER) // Arbitrary...
+        if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
+         || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
             MOJOSHADER_freeParseData(object->shader.shader);
-        else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER) // Arbitrary...
+        else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER2D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLER3D
+              || object->type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
             f((void *) object->mapping.name, d);
         else if (object->type == MOJOSHADER_SYMTYPE_STRING)
             f((void *) object->string.string, d);
