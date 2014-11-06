@@ -627,7 +627,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                 const char *array = readstring(*ptr, 0, m, d);
                 printf("ARRAY: %s\n", array);
                 */
-            }
+            } // if
 
             object->shader.shader = MOJOSHADER_parse(profile, *ptr + start, length,
                                                      swiz, swizcount, smap, smapcount,
