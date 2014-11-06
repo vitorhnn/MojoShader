@@ -7934,6 +7934,11 @@ static int parse_version_token(Context *ctx, const char *profilestr)
         ctx->shader_type = MOJOSHADER_TYPE_VERTEX;
         ctx->shader_type_str = "vs";
     } // else if
+    else if (shadertype == 0x4658)
+    {
+        ctx->shader_type = MOJOSHADER_TYPE_EFFECT;
+        ctx->shader_type_str = "fx";
+    } // else if
     else  // geometry shader? Bogus data?
     {
         fail(ctx, "Unsupported shader type or not a shader at all");

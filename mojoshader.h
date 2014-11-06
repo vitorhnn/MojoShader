@@ -71,6 +71,7 @@ typedef enum
     MOJOSHADER_TYPE_PIXEL    = (1 << 0),
     MOJOSHADER_TYPE_VERTEX   = (1 << 1),
     MOJOSHADER_TYPE_GEOMETRY = (1 << 2),  /* (not supported yet.) */
+    MOJOSHADER_TYPE_EFFECT   = (1 << 3),  /* used in effect passes */
     MOJOSHADER_TYPE_ANY = 0xFFFFFFFF   /* used for bitmasks */
 } MOJOSHADER_shaderType;
 

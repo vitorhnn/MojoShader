@@ -598,7 +598,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
         const uint32 index = readui32(ptr, len);
         /*const uint32 FIXME =*/ readui32(ptr, len);
         const uint32 state = readui32(ptr, len);
-        /*const uint32 type =*/ readui32(ptr, len);
+        const uint32 type = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
         uint32 objectIndex;
@@ -613,10 +613,25 @@ static void readlargeobjects(const uint32 numlargeobjects,
         {
             object->shader.technique = technique;
             object->shader.pass = index;
-            object->shader.shader = MOJOSHADER_parse(profile, *ptr, length,
+
+            uint32 start = 0;
+            if (type == 2)
+            {
+                /* This is a special kind of shader.
+                 * It doesn't actually do any work, but rather, it takes in a
+                 * parameter that selects a _real_ shader from some specified
+                 * array of shaders.
+                 */
+                start = *((uint32 *) *ptr) + 4;
+                /* TODO: Store this somewhere! -flibit
+                const char *array = readstring(*ptr, 0, m, d);
+                printf("ARRAY: %s\n", array);
+                */
+            }
+
+            object->shader.shader = MOJOSHADER_parse(profile, *ptr + start, length,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
-
             // !!! FIXME: check for errors.
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
