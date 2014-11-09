@@ -364,7 +364,7 @@ static void readparameters(const uint32 numparams,
                            MOJOSHADER_malloc m,
                            void *d)
 {
-    int i, j;
+    int i;
     if (numparams == 0) return;
 
     uint32 siz = sizeof(MOJOSHADER_effectParam) * numparams;

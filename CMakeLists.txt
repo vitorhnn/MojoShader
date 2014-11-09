@@ -9,9 +9,9 @@ OPTION(MS_DEBUG "Build MojoShader with debugging symbols" ON)
 
 # Compiler Flags
 IF(MS_DEBUG)
-	SET(CMAKE_CXX_FLAGS "-g -Wall -pedantic")
+	SET(CMAKE_C_FLAGS "-g -Wall")
 ELSE()
-	SET(CMAKE_CXX_FLAGS "-O2 -Wall -pedantic")
+	SET(CMAKE_C_FLAGS "-O2 -Wall")
 ENDIF()
 
 # Linker Flags
