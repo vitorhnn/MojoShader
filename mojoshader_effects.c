@@ -615,6 +615,8 @@ static void readlargeobjects(const uint32 numlargeobjects,
             object->shader.pass = index;
 
             uint32 start = 0;
+            uint32 end = 0;
+            const char *emitter = profile;
             if (type == 2)
             {
                 /* This is a special kind of shader.
@@ -623,13 +625,15 @@ static void readlargeobjects(const uint32 numlargeobjects,
                  * array of shaders.
                  */
                 start = *((uint32 *) *ptr) + 4;
+                end = 10; /* FIXME: What?! -flibit */
+                emitter = "d3d";
                 /* TODO: Store this somewhere! -flibit
                 const char *array = readstring(*ptr, 0, m, d);
                 printf("ARRAY: %s\n", array);
                 */
             } // if
 
-            object->shader.shader = MOJOSHADER_parse(profile, *ptr + start, length,
+            object->shader.shader = MOJOSHADER_parse(emitter, *ptr + start, length - end,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
             // !!! FIXME: check for errors.
