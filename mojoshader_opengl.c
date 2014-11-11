@@ -2773,7 +2773,7 @@ void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
 
     if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVESHADERSTATE))
         glEffect->prev_program = ctx->bound_program;
-} // MOJOSHADER_effectBegin
+} // MOJOSHADER_glEffectBegin
 
 
 void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
@@ -2801,7 +2801,7 @@ void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect)
         MOJOSHADER_glBindProgram(glEffect->prev_program);
     glEffect->effect->save_state = 0;
     glEffect->effect->state_changes = NULL;
-} // MOJOSHADER_effectEnd
+} // MOJOSHADER_glEffectEnd
 
 // end of mojoshader_opengl.c ...
 
