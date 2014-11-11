@@ -871,5 +871,75 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
     f((void *) effect, d);
 } // MOJOSHADER_freeEffect
 
+
+void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_effectParam *parameter,
+                                        const void *data,
+                                        const unsigned int offset,
+                                        const unsigned int len)
+{
+    memcpy(parameter->value.values + offset, data, len);
+} // MOJOSHADER_effectSetRawValueHandle
+
+
+void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
+                                      const char *name,
+                                      const void *data,
+                                      const unsigned int offset,
+                                      const unsigned int len)
+{
+    int i;
+    for (i = 0; i < effect->param_count; i++)
+    {
+        if (strcmp(name, effect->params[i].value.name) == 0)
+        {
+            memcpy(effect->params[i].value.values + offset, data, len);
+            return;
+        } // if
+    } // for
+    assert(0 && "Effect parameter not found!");
+} // MOJOSHADER_effectSetRawValueName
+
+
+MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect)
+{
+    return &effect->techniques[effect->current_technique];
+} // MOJOSHADER_effectGetCurrentTechnique
+
+
+void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
+                                   const MOJOSHADER_effectTechnique *technique)
+{
+    int i;
+    for (i = 0; i < effect->technique_count; i++)
+    {
+        if (technique == &effect->techniques[i])
+        {
+            effect->current_technique = i;
+            return;
+        } // if
+    } // for
+    assert(0 && "Technique is not part of this effect!");
+} // MOJOSHADER_effectSetTechnique
+
+
+MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
+                                                                    const MOJOSHADER_effectTechnique *technique
+)
+{
+    int i;
+    if (technique == NULL)
+        return &effect->techniques[0];
+    for (i = 0; i < effect->technique_count; i++)
+    {
+        if (technique == &effect->techniques[i])
+        {
+            if (i == effect->technique_count - 1)
+                return NULL; /* We were passed the last technique! */
+            return &effect->techniques[i + 1];
+        } // if
+    } // for
+    assert(0 && "Technique is not part of this effect!");
+} // MOJOSHADER_effectFindNextValidTechnique
+
 // end of mojoshader_effects.c ...
 

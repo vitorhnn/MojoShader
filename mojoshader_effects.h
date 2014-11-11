@@ -262,6 +262,7 @@ typedef enum MOJOSHADER_degreeType
     MOJOSHADER_DEGREE_QUINTIC   = 5
 } MOJOSHADER_degreeType;
 
+
 /* MOJOSHADER_effectSamplerState types... */
 
 typedef enum MOJOSHADER_samplerStateType
@@ -305,6 +306,7 @@ typedef enum MOJOSHADER_textureFilterType
     MOJOSHADER_TEXTUREFILTER_GAUSSIANQUAD,
     MOJOSHADER_TEXTUREFILTER_CONVOLUTIONMONO
 } MOJOSHADER_textureFilterType;
+
 
 /* Effect value types... */
 
@@ -363,6 +365,7 @@ struct MOJOSHADER_effectSamplerState
 
 typedef MOJOSHADER_effectValue MOJOSHADER_effectAnnotation;
 
+
 /* Effect interface structures... */
 
 typedef struct MOJOSHADER_effectParam
@@ -389,6 +392,7 @@ typedef struct MOJOSHADER_effectTechnique
     unsigned int annotation_count;
     MOJOSHADER_effectAnnotation* annotations;
 } MOJOSHADER_effectTechnique;
+
 
 /* Effect "objects"... */
 
@@ -429,6 +433,7 @@ typedef union MOJOSHADER_effectObject
         MOJOSHADER_effectTexture texture;
     };
 } MOJOSHADER_effectObject;
+
 
 /*
  * Structure used to return data from parsing of an effect file...
@@ -479,6 +484,11 @@ typedef struct MOJOSHADER_effect
     MOJOSHADER_effectTechnique *techniques;
 
     /*
+     * The index of the current technique being rendered by this effect.
+     */
+    int current_technique;
+
+    /*
      * The number of elements pointed to by (objects).
      */
     int object_count;
@@ -506,6 +516,9 @@ typedef struct MOJOSHADER_effect
     void *malloc_data;
 } MOJOSHADER_effect;
 
+
+/* Effect parsing interface... */
+
 /* !!! FIXME: document me. */
 const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                                                 const unsigned char *buf,
@@ -521,6 +534,89 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
 /* !!! FIXME: document me. */
 void MOJOSHADER_freeEffect(const MOJOSHADER_effect *effect);
+
+
+/* Effect parameter interface... */
+
+/* Set the constant value for the specified effect parameter.
+ *
+ * This function maps to ID3DXEffect::SetRawValue.
+ *
+ * (parameter) is a parameter obtained from a MOJOSHADER_effect*.
+ * (data) is the constant values to be applied to the parameter.
+ * (offset) is the offset, in bytes, of the parameter data being modified.
+ * (len) is the size, in bytes, of the data buffer being applied.
+ *
+ * This function is thread safe.
+ */
+void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_effectParam *parameter,
+                                        const void *data,
+                                        const unsigned int offset,
+                                        const unsigned int len);
+
+/* Set the constant value for the effect parameter, specified by name.
+ *  Note: this function is slower than MOJOSHADER_effectSetRawValueHandle(),
+ *  but we still provide it to fully map to ID3DXEffect.
+ *
+ * This function maps to ID3DXEffect::SetRawValue.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ * (name) is the human-readable name of the parameter being modified.
+ * (data) is the constant values to be applied to the parameter.
+ * (offset) is the offset, in bytes, of the parameter data being modified.
+ * (len) is the size, in bytes, of the data buffer being applied.
+ *
+ * This function is thread safe.
+ */
+void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
+                                      const char *name,
+                                      const void *data,
+                                      const unsigned int offset,
+                                      const unsigned int len);
+
+
+/* Effect technique interface... */
+
+/* Get the current technique in use by an effect.
+ *
+ * This function maps to ID3DXEffect::GetCurrentTechnique.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ *
+ * This function returns the technique currently used by the given effect.
+ *
+ * This function is thread safe.
+ */
+MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect);
+
+/* Set the current technique to be used an effect.
+ *
+ * This function maps to ID3DXEffect::SetTechnique.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ * (technique) is the technique to be used by the effect when rendered.
+ *
+ * This function is thread safe.
+ */
+void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
+                                   const MOJOSHADER_effectTechnique *technique);
+
+/* Get the next technique in an effect's list.
+ *
+ * This function maps to ID3DXEffect::FindNextValidTechnique.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ * (technique) can either be a technique found in the given effect, or NULL to
+ *  find the first technique in the given effect.
+ *
+ * This function returns either the next technique after the passed technique,
+ *  or the first technique if the passed technique is NULL.
+ *
+ * This function is thread safe.
+ */
+MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
+                                                                    const MOJOSHADER_effectTechnique *technique
+);
 
 #endif /* MOJOSHADER_EFFECT_SUPPORT */
 
