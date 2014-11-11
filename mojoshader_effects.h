@@ -441,7 +441,7 @@ typedef union MOJOSHADER_effectObject
 typedef enum MOJOSHADER_effectSaveState
 {
     MOJOSHADER_DONOTSAVERENDERSTATE  = 0x00000001,
-    MOJOSHADER_DONOTSAVESHADERSTATE  = 0x00000002, // TODO: Not currently supported!
+    MOJOSHADER_DONOTSAVESHADERSTATE  = 0x00000002,
     MOJOSHADER_DONOTSAVESAMPLERSTATE = 0x00000004
 } MOJOSHADER_effectSaveState;
 
@@ -654,49 +654,6 @@ MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSH
 );
 
 
-/* Effect Begin/End interface... */
-
-/* Prepare the effect for rendering with the currently applied technique.
- *
- * This function maps to ID3DXEffect::Begin.
- *
- * In addition to the expected Begin parameters, we also include a parameter
- *  to pass in a MOJOSHADER_effectRenderState. Rather than change the render
- *  state within MojoShader itself we will simply provide what the effect wants
- *  and allow you to use this information with your own renderer.
- *
- * You should expect the renderState to change in the following ways:
- *  - MOJOSHADER_*EffectBeginPass will update with the render state desired by
- *    the current effect pass.
- *  - MOJOSHADER_*EffectEndPass will update with the restored render state,
- *    depending on what state was asked to be saved.
- *
- * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
- * (numPasses) will be filled with the number of passes that this technique
- *  will need to fully render.
- * (saveState) is a flag informing the effect what rendering states to preserve
- *  after rendering the technique as well as each individual pass.
- * (renderState) will be filled by the effect to inform you of the render state
- *  changes introduced by the technique and its passes.
- *
- * This function is thread safe.
- */
-void MOJOSHADER_effectBegin(MOJOSHADER_effect *effect,
-                            unsigned int *numPasses,
-                            MOJOSHADER_effectSaveState saveState,
-                            MOJOSHADER_effectStateChanges *stateChanges);
-
-/* Complete rendering the effect technique, and restore the render state.
- *
- * This function maps to ID3DXEffect::End.
- *
- * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
- *
- * This function is thread safe.
- */
-void MOJOSHADER_effectEnd(MOJOSHADER_effect *effect);
-
-
 /* OpenGL effect interface... */
 
 typedef struct MOJOSHADER_glEffect MOJOSHADER_glEffect;
@@ -718,7 +675,7 @@ typedef struct MOJOSHADER_glEffect MOJOSHADER_glEffect;
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(const MOJOSHADER_effect *effect);
+MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect);
 
 /* Delete the shaders that were allocated for an effect.
  *
@@ -730,6 +687,41 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(const MOJOSHADER_effect *effect)
  * the GL context.
  */
 void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *effect);
+
+/* Prepare the effect for rendering with the currently applied technique.
+ *
+ * This function maps to ID3DXEffect::Begin.
+ *
+ * In addition to the expected Begin parameters, we also include a parameter
+ *  to pass in a MOJOSHADER_effectRenderState. Rather than change the render
+ *  state within MojoShader itself we will simply provide what the effect wants
+ *  and allow you to use this information with your own renderer.
+ *
+ * You should expect the renderState to change in the following ways:
+ *  - MOJOSHADER_glEffectBeginPass will update with the render state desired by
+ *    the current effect pass.
+ *  - MOJOSHADER_glEffectEndPass will update with the restored render state,
+ *    depending on what state was asked to be saved.
+ *  - MOJOSHADER_effectEnd will restore the shader state, if the application
+ *    requested that it be restored.
+ *
+ * (glEffect) is a MOJOSHADER_glEffect* obtained from
+ *  MOJOSHADER_glCompileEffect().
+ * (numPasses) will be filled with the number of passes that this technique
+ *  will need to fully render.
+ * (saveState) is a flag informing the effect what rendering states to preserve
+ *  after rendering the technique as well as each individual pass.
+ * (renderState) will be filled by the effect to inform you of the render state
+ *  changes introduced by the technique and its passes.
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
+                              unsigned int *numPasses,
+                              MOJOSHADER_effectSaveState saveState,
+                              MOJOSHADER_effectStateChanges *stateChanges);
 
 /* Begin an effect pass from the currently applied technique.
  *
@@ -743,7 +735,7 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *effect);
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-void MOJOSHADER_glEffectBeginPass(const MOJOSHADER_glEffect *glEffect,
+void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                                   unsigned int pass);
 
 /* Push render state changes that occurred within an actively rendering pass.
@@ -757,7 +749,7 @@ void MOJOSHADER_glEffectBeginPass(const MOJOSHADER_glEffect *glEffect,
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-void MOJOSHADER_glEffectCommitChanges(const MOJOSHADER_glEffect *glEffect);
+void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect);
 
 /* End an effect pass from the currently applied technique.
  *
@@ -770,7 +762,20 @@ void MOJOSHADER_glEffectCommitChanges(const MOJOSHADER_glEffect *glEffect);
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-void MOJOSHADER_glEffectEndPass(const MOJOSHADER_glEffect *glEffect);
+void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffect);
+
+/* Complete rendering the effect technique, and restore the render state.
+ *
+ * This function maps to ID3DXEffect::End.
+ *
+ * (glEffect) is a MOJOSHADER_glEffect* obtained from
+ *  MOJOSHADER_glCompileEffect().
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect);
 
 #endif /* MOJOSHADER_EFFECT_SUPPORT */
 
