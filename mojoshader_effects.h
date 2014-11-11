@@ -696,6 +696,82 @@ void MOJOSHADER_effectBegin(MOJOSHADER_effect *effect,
  */
 void MOJOSHADER_effectEnd(MOJOSHADER_effect *effect);
 
+
+/* OpenGL effect interface... */
+
+typedef struct MOJOSHADER_glEffect MOJOSHADER_glEffect;
+
+/* Fully compile/link the shaders found within the effect.
+ *
+ * The MOJOSHADER_glEffect* is solely for use within the OpenGL-specific calls.
+ *  In all other cases you will be using the MOJOSHADER_effect* instead.
+ *
+ * In a typical use case, you will be calling this immediately after obtaining
+ *  the MOJOSHADER_effect*.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ *
+ * This function returns a MOJOSHADER_glEffect*, containing OpenGL-specific
+ *  data for an accompanying MOJOSHADER_effect*.
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(const MOJOSHADER_effect *effect);
+
+/* Delete the shaders that were allocated for an effect.
+ *
+ * (glEffect) is a MOJOSHADER_glEffect* obtained from
+ *  MOJOSHADER_glCompileEffect().
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *effect);
+
+/* Begin an effect pass from the currently applied technique.
+ *
+ * This function maps to ID3DXEffect::BeginPass.
+ *
+ * (glEffect) is a MOJOSHADER_glEffect* obtained from
+ *  MOJOSHADER_glCompileEffect().
+ * (pass) is the index of the effect pass as found in the current technique.
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+void MOJOSHADER_glEffectBeginPass(const MOJOSHADER_glEffect *glEffect,
+                                  unsigned int pass);
+
+/* Push render state changes that occurred within an actively rendering pass.
+ *
+ * This function maps to ID3DXEffect::CommitChanges.
+ *
+ * (glEffect) is a MOJOSHADER_glEffect* obtained from
+ *  MOJOSHADER_glCompileEffect().
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+void MOJOSHADER_glEffectCommitChanges(const MOJOSHADER_glEffect *glEffect);
+
+/* End an effect pass from the currently applied technique.
+ *
+ * This function maps to ID3DXEffect::EndPass.
+ *
+ * (glEffect) is a MOJOSHADER_glEffect* obtained from
+ *  MOJOSHADER_glCompileEffect().
+ *
+ * This call is NOT thread safe! As most OpenGL implementations are not thread
+ * safe, you should probably only call this from the same thread that created
+ * the GL context.
+ */
+void MOJOSHADER_glEffectEndPass(const MOJOSHADER_glEffect *glEffect);
+
 #endif /* MOJOSHADER_EFFECT_SUPPORT */
 
 #endif /* MOJOSHADER_EFFECTS_H */

@@ -2661,5 +2661,123 @@ void MOJOSHADER_glDestroyContext(MOJOSHADER_glContext *_ctx)
     ctx = ((current_ctx == _ctx) ? NULL : current_ctx);
 } // MOJOSHADER_glDestroyContext
 
+
+struct MOJOSHADER_glEffect
+{
+    const MOJOSHADER_effect *effect;
+    unsigned int num_shaders;
+    MOJOSHADER_glShader *shaders;
+    unsigned int *shader_indices;
+};
+
+
+MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(const MOJOSHADER_effect *effect)
+{
+    int i;
+    MOJOSHADER_malloc m = effect->malloc;
+    MOJOSHADER_free f = effect->free;
+    void *d = effect->malloc_data;
+    int current_shader = 0;
+    GLuint shader = 0;
+
+    MOJOSHADER_glEffect *retval = (MOJOSHADER_glEffect *) m(sizeof (MOJOSHADER_glEffect), d);
+    if (retval == NULL)
+    {
+        out_of_memory();
+        return NULL;
+    } // if
+    memset(retval, '\0', sizeof (MOJOSHADER_glEffect));
+
+    // Count the number of shaders before allocating
+    for (i = 0; i < effect->object_count; i++)
+    {
+        MOJOSHADER_effectObject *object = &effect->objects[i];
+        if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
+         || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
+            retval->num_shaders++;
+    } // for
+
+    retval->shaders = m(retval->num_shaders * sizeof (MOJOSHADER_glShader), d);
+    if (retval->shaders == NULL)
+    {
+        f(retval, d);
+        out_of_memory();
+        return NULL;
+    } // if
+    memset(retval->shaders, '\0', retval->num_shaders * sizeof (MOJOSHADER_glShader));
+    retval->shader_indices = m(retval->num_shaders * sizeof (unsigned int), d);
+    if (retval->shader_indices == NULL)
+    {
+        f(retval->shaders, d);
+        f(retval, d);
+        out_of_memory();
+        return NULL;
+    } // if
+    memset(retval->shader_indices, '\0', retval->num_shaders * sizeof (unsigned int));
+
+    // Run through the shaders again, compiling and tracking the object indices
+    for (i = 0; i < effect->object_count; i++)
+    {
+        MOJOSHADER_effectObject *object = &effect->objects[i];
+        if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
+         || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
+        {
+            if (!ctx->profileCompileShader(object->shader.shader, &shader));
+                goto compile_shader_fail;
+            retval->shaders[current_shader].parseData = object->shader.shader;
+            retval->shaders[current_shader].handle = shader;
+            retval->shaders[current_shader].refcount = 1;
+            retval->shader_indices[current_shader] = i;
+            current_shader++;
+        } // if
+    } // for
+
+    retval->effect = effect;
+    return retval;
+
+compile_shader_fail:
+    for (i = 0; i < retval->num_shaders; i++)
+        if (retval->shaders[i].handle != 0)
+            ctx->profileDeleteShader(retval->shaders[i].handle);
+    f(retval->shader_indices, d);
+    f(retval->shaders, d);
+    f(retval, d);
+    return NULL;
+} // MOJOSHADER_glCompileEffect
+
+
+void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect)
+{
+    int i;
+    MOJOSHADER_free f = glEffect->effect->free;
+    void *d = glEffect->effect->malloc_data;
+
+    for (i = 0; i < glEffect->num_shaders; i++)
+        ctx->profileDeleteShader(glEffect->shaders[i].handle);
+
+    f(glEffect->shader_indices, d);
+    f(glEffect->shaders, d);
+    f(glEffect, d);
+} // MOJOSHADER_glDeleteEffect
+
+
+void MOJOSHADER_glEffectBeginPass(const MOJOSHADER_glEffect *glEffect,
+                                  unsigned int pass)
+{
+    // TODO -flibit
+} // MOJOSHADER_glEffectBeginPass
+
+
+void MOJOSHADER_glEffectCommitChanges(const MOJOSHADER_glEffect *glEffect)
+{
+    // TODO -flibit
+} // MOJOSHADER_glEffectCommitChanges
+
+
+void MOJOSHADER_glEffectEndPass(const MOJOSHADER_glEffect *glEffect)
+{
+    // TODO -flibit
+} // MOJOSHADER_glEffectEndPass
+
 // end of mojoshader_opengl.c ...
 
