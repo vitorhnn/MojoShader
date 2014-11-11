@@ -435,6 +435,31 @@ typedef union MOJOSHADER_effectObject
 } MOJOSHADER_effectObject;
 
 
+/* Effect render state structures... */
+
+/* Used to select which render states should be preserved by the effect pass */
+typedef enum MOJOSHADER_effectSaveState
+{
+    MOJOSHADER_DONOTSAVERENDERSTATE  = 0x00000001,
+    MOJOSHADER_DONOTSAVESHADERSTATE  = 0x00000002, // TODO: Not currently supported!
+    MOJOSHADER_DONOTSAVESAMPLERSTATE = 0x00000004
+} MOJOSHADER_effectSaveState;
+
+/* Used to acquire the desired render state by the effect pass, and to restore
+ * state changes introduced by the effect pass.
+ */
+typedef struct MOJOSHADER_effectStateChanges
+{
+    /* Render state changes caused by effect technique */
+    unsigned int render_state_change_count;
+    const MOJOSHADER_effectState *render_state_changes;
+
+    /* Sampler state changes caused by effect technique */
+    unsigned int sampler_state_change_count;
+    const MOJOSHADER_effectSamplerState *sampler_state_changes;
+} MOJOSHADER_effectStateChanges;
+
+
 /*
  * Structure used to return data from parsing of an effect file...
  */
@@ -499,6 +524,16 @@ typedef struct MOJOSHADER_effect
      * This can be NULL on error or if (object_count) is zero.
      */
     MOJOSHADER_effectObject *objects;
+
+    /*
+     * The current state change storage behavior requested by the application.
+     */
+    MOJOSHADER_effectSaveState save_state;
+
+    /*
+     * The structure provided by the appliation to store the state changes.
+     */
+    MOJOSHADER_effectStateChanges *state_changes;
 
     /*
      * This is the malloc implementation you passed to MOJOSHADER_parseEffect().
@@ -617,6 +652,49 @@ void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
 MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
                                                                     const MOJOSHADER_effectTechnique *technique
 );
+
+
+/* Effect Begin/End interface... */
+
+/* Prepare the effect for rendering with the currently applied technique.
+ *
+ * This function maps to ID3DXEffect::Begin.
+ *
+ * In addition to the expected Begin parameters, we also include a parameter
+ *  to pass in a MOJOSHADER_effectRenderState. Rather than change the render
+ *  state within MojoShader itself we will simply provide what the effect wants
+ *  and allow you to use this information with your own renderer.
+ *
+ * You should expect the renderState to change in the following ways:
+ *  - MOJOSHADER_*EffectBeginPass will update with the render state desired by
+ *    the current effect pass.
+ *  - MOJOSHADER_*EffectEndPass will update with the restored render state,
+ *    depending on what state was asked to be saved.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ * (numPasses) will be filled with the number of passes that this technique
+ *  will need to fully render.
+ * (saveState) is a flag informing the effect what rendering states to preserve
+ *  after rendering the technique as well as each individual pass.
+ * (renderState) will be filled by the effect to inform you of the render state
+ *  changes introduced by the technique and its passes.
+ *
+ * This function is thread safe.
+ */
+void MOJOSHADER_effectBegin(MOJOSHADER_effect *effect,
+                            unsigned int *numPasses,
+                            MOJOSHADER_effectSaveState saveState,
+                            MOJOSHADER_effectStateChanges *stateChanges);
+
+/* Complete rendering the effect technique, and restore the render state.
+ *
+ * This function maps to ID3DXEffect::End.
+ *
+ * (effect) is a MOJOSHADER_effect* obtained from MOJOSHADER_parseEffect().
+ *
+ * This function is thread safe.
+ */
+void MOJOSHADER_effectEnd(MOJOSHADER_effect *effect);
 
 #endif /* MOJOSHADER_EFFECT_SUPPORT */
 

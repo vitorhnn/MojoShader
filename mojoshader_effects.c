@@ -941,5 +941,23 @@ MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSH
     assert(0 && "Technique is not part of this effect!");
 } // MOJOSHADER_effectFindNextValidTechnique
 
+
+void MOJOSHADER_effectBegin(MOJOSHADER_effect *effect,
+                            unsigned int *numPasses,
+                            MOJOSHADER_effectSaveState saveState,
+                            MOJOSHADER_effectStateChanges *stateChanges)
+{
+    *numPasses = effect->techniques[effect->current_technique].pass_count;
+    effect->save_state = saveState;
+    effect->state_changes = stateChanges;
+} // MOJOSHADER_effectBegin
+
+
+void MOJOSHADER_effectEnd(MOJOSHADER_effect *effect)
+{
+    effect->save_state = 0;
+    effect->state_changes = NULL;
+} // MOJOSHADER_effectEnd
+
 // end of mojoshader_effects.c ...
 
