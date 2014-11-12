@@ -614,29 +614,30 @@ static void readlargeobjects(const uint32 numlargeobjects,
             object->shader.technique = technique;
             object->shader.pass = index;
 
-            uint32 start = 0;
-            uint32 end = 0;
             const char *emitter = profile;
             if (type == 2)
             {
-                /* This is a special kind of shader.
-                 * It doesn't actually do any work, but rather, it takes in a
-                 * parameter that selects a _real_ shader from some specified
-                 * array of shaders.
+                /* This is a standalone preshader!
+                 * It exists solely for effect passes that do not use a single
+                 * vertex/fragment shader.
                  */
-                start = *((uint32 *) *ptr) + 4;
-                end = 10; /* FIXME: What?! -flibit */
-                emitter = "d3d";
+                object->shader.is_preshader = 1;
+                const uint32 start = *((uint32 *) *ptr) + 4;
                 /* TODO: Store this somewhere! -flibit
                 const char *array = readstring(*ptr, 0, m, d);
                 printf("ARRAY: %s\n", array);
                 */
+                object->shader.preshader = MOJOSHADER_parsePreshader(*ptr + start, length,
+                                                                     m, d);
+                // !!! FIXME: check for errors.
             } // if
-
-            object->shader.shader = MOJOSHADER_parse(emitter, *ptr + start, length - end,
-                                                     swiz, swizcount, smap, smapcount,
-                                                     m, f, d);
-            // !!! FIXME: check for errors.
+            else
+            {
+                object->shader.shader = MOJOSHADER_parse(emitter, *ptr, length,
+                                                         swiz, swizcount, smap, smapcount,
+                                                         m, f, d);
+                // !!! FIXME: check for errors.
+            }
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
@@ -855,7 +856,10 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
         MOJOSHADER_effectObject *object = &effect->objects[i];
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
-            MOJOSHADER_freeParseData(object->shader.shader);
+            if (object->shader.is_preshader)
+                MOJOSHADER_freePreshader(object->shader.preshader, f, d);
+            else
+                MOJOSHADER_freeParseData(object->shader.shader);
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER2D

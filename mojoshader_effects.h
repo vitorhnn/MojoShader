@@ -401,7 +401,12 @@ typedef struct MOJOSHADER_effectShader
     MOJOSHADER_symbolType type;
     unsigned int technique;
     unsigned int pass;
-    const MOJOSHADER_parseData *shader;
+    unsigned int is_preshader;
+    union
+    {
+        const MOJOSHADER_parseData *shader;
+        const MOJOSHADER_preshader *preshader;
+    };
 } MOJOSHADER_effectShader;
 
 typedef struct MOJOSHADER_effectSamplerMap

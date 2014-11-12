@@ -7934,11 +7934,6 @@ static int parse_version_token(Context *ctx, const char *profilestr)
         ctx->shader_type = MOJOSHADER_TYPE_VERTEX;
         ctx->shader_type_str = "vs";
     } // else if
-    else if (shadertype == 0x4658)
-    {
-        ctx->shader_type = MOJOSHADER_TYPE_EFFECT;
-        ctx->shader_type_str = "fx";
-    } // else if
     else  // geometry shader? Bogus data?
     {
         fail(ctx, "Unsupported shader type or not a shader at all");
@@ -8201,10 +8196,12 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
     // !!! FIXME: I don't know what specific versions signify, but we need to
     // !!! FIXME:  save this to test against the CTAB version field, if
     // !!! FIXME:  nothing else.
-    // !!! FIXME: 0x02 0x01 is probably the version (fx_2_1),
+    // !!! FIXME: 0x02 0x0? is probably the version (fx_2_?),
     // !!! FIXME:  and 0x4658 is the magic, like a real shader's version token.
-    const uint32 okay_version = 0x46580201;
-    if (SWAP32(tokens[2]) != okay_version)
+    const uint32 min_version = 0x46580200;
+    const uint32 max_version = 0x46580201;
+    const uint32 version = SWAP32(tokens[2]);
+    if (version < min_version || version > max_version)
     {
         fail(ctx, "Unsupported preshader version.");
         return;  // fail because the shader will malfunction w/o this.
@@ -8331,7 +8328,7 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
     // Now we'll figure out the CTAB...
     CtabData ctabdata = { 0, 0, 0 };
     parse_constant_table(ctx, ctab.tokens - 1, ctab.tokcount * 4,
-                         okay_version, 0, &ctabdata);
+                         version, 0, &ctabdata);
 
     // preshader owns this now. Don't free it in this function.
     preshader->symbol_count = ctabdata.symbol_count;
@@ -8717,19 +8714,6 @@ static void free_symbols(MOJOSHADER_free f, void *d, MOJOSHADER_symbol *syms,
 } // free_symbols
 
 
-static void free_preshader(MOJOSHADER_free f, void *d,
-                           MOJOSHADER_preshader *preshader)
-{
-    if (preshader != NULL)
-    {
-        f((void *) preshader->literals, d);
-        f((void *) preshader->instructions, d);
-        free_symbols(f, d, preshader->symbols, preshader->symbol_count);
-        f((void *) preshader, d);
-    } // if
-} // free_preshader
-
-
 static void destroy_context(Context *ctx)
 {
     if (ctx != NULL)
@@ -8752,7 +8736,7 @@ static void destroy_context(Context *ctx)
         free_variable_list(f, d, ctx->variables);
         errorlist_destroy(ctx->errors);
         free_symbols(f, d, ctx->ctab.symbols, ctx->ctab.symbol_count);
-        free_preshader(f, d, ctx->preshader);
+        MOJOSHADER_freePreshader(ctx->preshader, f, d);
         f(ctx, d);
     } // if
 } // destroy_context
@@ -9525,7 +9509,7 @@ void MOJOSHADER_freeParseData(const MOJOSHADER_parseData *_data)
     f((void *) data->samplers, d);
 
     free_symbols(f, d, data->symbols, data->symbol_count);
-    free_preshader(f, d, data->preshader);
+    MOJOSHADER_freePreshader(data->preshader, f, d);
 
     f(data, d);
 } // MOJOSHADER_freeParseData
@@ -9557,6 +9541,30 @@ int MOJOSHADER_maxShaderModel(const char *profile)
     #undef PROFILE_SHADER_MODEL
     return -1;  // unknown profile?
 } // MOJOSHADER_maxShaderModel
+
+
+const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
+                                                      const unsigned int len,
+                                                      MOJOSHADER_malloc m,
+                                                      void *d)
+{
+    // TODO: See parse_preshader! -flibit
+    return NULL;
+} // MOJOSHADER_parsePreshader
+
+
+void MOJOSHADER_freePreshader(const MOJOSHADER_preshader *preshader,
+                              MOJOSHADER_free f,
+                              void *d)
+{
+    if (preshader != NULL)
+    {
+        f((void *) preshader->literals, d);
+        f((void *) preshader->instructions, d);
+        free_symbols(f, d, preshader->symbols, preshader->symbol_count);
+        f((void *) preshader, d);
+    } // if
+} // MOJOSHADER_freePreshader
 
 // end of mojoshader.c ...
 

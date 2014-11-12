@@ -71,7 +71,6 @@ typedef enum
     MOJOSHADER_TYPE_PIXEL    = (1 << 0),
     MOJOSHADER_TYPE_VERTEX   = (1 << 1),
     MOJOSHADER_TYPE_GEOMETRY = (1 << 2),  /* (not supported yet.) */
-    MOJOSHADER_TYPE_EFFECT   = (1 << 3),  /* used in effect passes */
     MOJOSHADER_TYPE_ANY = 0xFFFFFFFF   /* used for bitmasks */
 } MOJOSHADER_shaderType;
 
@@ -738,6 +737,19 @@ const MOJOSHADER_parseData *MOJOSHADER_parse(const char *profile,
                                              MOJOSHADER_malloc m,
                                              MOJOSHADER_free f,
                                              void *d);
+
+
+/* !!! FIXME: document me. */
+const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
+                                                      const unsigned int len,
+                                                      MOJOSHADER_malloc m,
+                                                      void *d);
+
+
+/* !!! FIXME: document me. */
+void MOJOSHADER_freePreshader(const MOJOSHADER_preshader *preshader,
+                              MOJOSHADER_free f,
+                              void *d);
 
 /*
  * Call this to dispose of parsing results when you are done with them.
