@@ -2781,14 +2781,15 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 {
     int i, j;
     int numStates = 0;
-    MOJOSHADER_effectState *curState;
-    MOJOSHADER_effectState *states;
+    MOJOSHADER_effectState *state;
     MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
     MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
 
+    /* TODO: Used for sampler state change storage
     MOJOSHADER_malloc m = glEffect->effect->malloc;
     MOJOSHADER_free f = glEffect->effect->free;
     void *d = glEffect->effect->malloc_data;
+    */
 
     MOJOSHADER_effectPass *curPass = &glEffect->effect->techniques[glEffect->effect->current_technique].passes[pass];
 
@@ -2797,38 +2798,23 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 
     for (i = 0; i < curPass->state_count; i++)
     {
-        curState = &curPass->states[i];
-        if (curState->type == MOJOSHADER_RS_VERTEXSHADER)
+        state = &curPass->states[i];
+        if (state->type == MOJOSHADER_RS_VERTEXSHADER)
             for (j = 0; j < glEffect->num_shaders; j++)
-                if (*curState->value.valuesI == glEffect->shader_indices[j])
+                if (*state->value.valuesI == glEffect->shader_indices[j])
                     vertShader = &glEffect->shaders[j];
-        else if (curState->type == MOJOSHADER_RS_PIXELSHADER)
+        else if (state->type == MOJOSHADER_RS_PIXELSHADER)
             for (j = 0; j < glEffect->num_shaders; j++)
-                if (*curState->value.valuesI == glEffect->shader_indices[j])
+                if (*state->value.valuesI == glEffect->shader_indices[j])
                     fragShader = &glEffect->shaders[j];
         else
             numStates++;
     } // for
 
-    // !!! FIXME: Tremendously inefficient! -flibit
-    if (numStates != glEffect->effect->state_changes->render_state_change_count)
-    {
-        j = 0;
-        states = (MOJOSHADER_effectState *) m(numStates * sizeof (MOJOSHADER_effectState), d);
-        for (i = 0; i < curPass->state_count; i++)
-        {
-            curState = &curPass->states[i];
-            if (curState->type != MOJOSHADER_RS_VERTEXSHADER
-             && curState->type != MOJOSHADER_RS_PIXELSHADER)
-                memcpy(&states[j++], curState, sizeof (MOJOSHADER_effectState));
-        } // for
+    glEffect->effect->state_changes->render_state_changes = curPass->states;
+    glEffect->effect->state_changes->render_state_change_count = curPass->state_count;
 
-        if (glEffect->effect->state_changes->render_state_changes != NULL)
-            f((void *) glEffect->effect->state_changes->render_state_changes, d);
-        glEffect->effect->state_changes->render_state_changes = states;
-        glEffect->effect->state_changes->render_state_change_count = numStates;
-    } // if
-
+    // TODO: Map effect parameters to shader uniforms -flibit
     // TODO: Sampler states -flibit
 
     MOJOSHADER_glBindShaders(vertShader, fragShader);
