@@ -2779,7 +2779,30 @@ void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
 void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                                   unsigned int pass)
 {
-    // TODO -flibit
+    int i, j;
+    MOJOSHADER_effectState *state;
+    MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
+    MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
+    MOJOSHADER_effectPass *curPass = &glEffect->effect->techniques[glEffect->effect->current_technique].passes[pass];
+
+    assert(glEffect->effect->current_pass == -1);
+    glEffect->effect->current_pass = pass;
+
+    for (i = 0; i < curPass->state_count; i++)
+    {
+        state = &curPass->states[i];
+        // TODO: All render states!
+        if (state->type == MOJOSHADER_RS_VERTEXSHADER)
+            for (j = 0; j < glEffect->num_shaders; j++)
+                if (*state->value.valuesI == glEffect->shader_indices[j])
+                    vertShader = &glEffect->shaders[j];
+        else if (state->type == MOJOSHADER_RS_PIXELSHADER)
+            for (j = 0; j < glEffect->num_shaders; j++)
+                if (*state->value.valuesI == glEffect->shader_indices[j])
+                    fragShader = &glEffect->shaders[j];
+    } // for
+
+    MOJOSHADER_glBindShaders(vertShader, fragShader);
 } // MOJOSHADER_glEffectBeginPass
 
 
@@ -2791,7 +2814,18 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 
 void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffect)
 {
-    // TODO -flibit
+    if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVERENDERSTATE))
+    {
+        // TODO -flibit
+    } // if
+
+    if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVESAMPLERSTATE))
+    {
+        // TODO -flibit
+    } // if
+
+    assert(glEffect->effect->current_pass != -1);
+    glEffect->effect->current_pass = -1;
 } // MOJOSHADER_glEffectEndPass
 
 
@@ -2799,6 +2833,7 @@ void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect)
 {
     if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVESHADERSTATE))
         MOJOSHADER_glBindProgram(glEffect->prev_program);
+
     glEffect->effect->save_state = 0;
     glEffect->effect->state_changes = NULL;
 } // MOJOSHADER_glEffectEnd

@@ -514,6 +514,11 @@ typedef struct MOJOSHADER_effect
     int current_technique;
 
     /*
+     * The index of the current pass being rendered by this effect.
+     */
+    int current_pass;
+
+    /*
      * The number of elements pointed to by (objects).
      */
     int object_count;
