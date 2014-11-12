@@ -9544,11 +9544,317 @@ int MOJOSHADER_maxShaderModel(const char *profile)
 
 
 const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
-                                                      const unsigned int len,
+                                                      const unsigned int _len,
                                                       MOJOSHADER_malloc m,
+                                                      MOJOSHADER_free f,
                                                       void *d)
 {
-    // TODO: See parse_preshader! -flibit
+    // !!! FIXME: This is copypasta ripped from parse_preshader -flibit
+
+    const uint32 *tokens = (const uint32 *) buf;
+    uint32 tokcount = _len / 4;
+
+    // !!! FIXME: This is stupid. -flibit
+    Context fillerContext;
+    fillerContext.malloc = m;
+    fillerContext.free = f;
+    fillerContext.malloc_data = d;
+
+    MOJOSHADER_preshader *preshader = NULL;
+
+    const uint32 version_magic = 0x46580000;
+    const uint32 min_version = 0x00000200 | version_magic;
+    const uint32 max_version = 0x00000201 | version_magic;
+    const uint32 version = SWAP32(tokens[0]);
+    if (version < min_version || version > max_version)
+    {
+        // fail because the shader will malfunction w/o this.
+        goto parsePreshader_notAPreshader;
+    } // if
+
+    tokens++;
+    tokcount++;
+
+    // All sections of a preshader are packed into separate comment tokens,
+    //  inside the containing comment token block. Find them all before
+    //  we start, so we don't care about the order they appear in the file.
+    PreshaderBlockInfo ctab = { 0, 0, 0 };
+    PreshaderBlockInfo prsi = { 0, 0, 0 };
+    PreshaderBlockInfo fxlc = { 0, 0, 0 };
+    PreshaderBlockInfo clit = { 0, 0, 0 };
+
+    while (tokcount > 0)
+    {
+        uint32 subtokcount = 0;
+        // !!! FIXME: Passing a NULL ctx! -flibit
+        if ( (!is_comment_token(&fillerContext, *tokens, &subtokcount)) ||
+             (subtokcount > tokcount) )
+        {
+            goto parsePreshader_notAPreshader;
+        } // if
+
+        tokens++;
+        tokcount--;
+
+        const uint32 *nexttokens = tokens + subtokcount;
+        const uint32 nexttokcount = tokcount - subtokcount;
+
+        if (subtokcount > 0)
+        {
+            switch (SWAP32(*tokens))
+            {
+                #define PRESHADER_BLOCK_CASE(id, var) \
+                    case id##_ID: { \
+                        if (var.seen) \
+                            goto parsePreshader_notAPreshader; \
+                        var.tokens = tokens; \
+                        var.tokcount = subtokcount; \
+                        var.seen = 1; \
+                        break; \
+                    }
+                PRESHADER_BLOCK_CASE(CTAB, ctab);
+                PRESHADER_BLOCK_CASE(PRSI, prsi);
+                PRESHADER_BLOCK_CASE(FXLC, fxlc);
+                PRESHADER_BLOCK_CASE(CLIT, clit);
+                default:
+                    // Bogus preshader section
+                    goto parsePreshader_notAPreshader;
+                #undef PRESHADER_BLOCK_CASE
+            } // switch
+        } // if
+
+        tokens = nexttokens;
+        tokcount = nexttokcount;
+    } // while
+
+    if (!ctab.seen) // No CTAB block in preshader
+        goto parsePreshader_notAPreshader;
+    if (!fxlc.seen) // No FXLC block in preshader
+        goto parsePreshader_notAPreshader;
+    if (!clit.seen) // No CLIT block in preshader
+        goto parsePreshader_notAPreshader;
+
+    preshader = (MOJOSHADER_preshader *) m(sizeof (MOJOSHADER_preshader), d);
+    if (preshader == NULL)
+        goto parsePreshader_outOfMemory;
+    memset(preshader, '\0', sizeof (MOJOSHADER_preshader));
+
+    // Let's set up the constant literals first...
+    if (clit.tokcount == 0) // Bogus CLIT block in preshader
+        goto parsePreshader_notAPreshader;
+    else
+    {
+        const uint32 lit_count = SWAP32(clit.tokens[1]);
+        if (lit_count > ((clit.tokcount - 2) / 2))
+            // Bogus CLIT block in preshader
+            goto parsePreshader_notAPreshader;
+        else if (lit_count > 0)
+        {
+            preshader->literal_count = (unsigned int) lit_count;
+            assert(sizeof (double) == 8);  // just in case.
+            const size_t len = sizeof (double) * lit_count;
+            preshader->literals = (double *) m(len, d);
+            if (preshader->literals == NULL)
+                goto parsePreshader_notAPreshader;  // oh well.
+            const double *litptr = (const double *) (clit.tokens + 2);
+            int i;
+            for (i = 0; i < lit_count; i++)
+                preshader->literals[i] = SWAPDBL(litptr[i]);
+        } // else if
+    } // else
+
+    // Parse out the PRSI block. This is used to map the output registers.
+    uint32 output_map_count = 0;
+    const uint32 *output_map = NULL;
+    if (prsi.seen)
+    {
+        if (prsi.tokcount < 8) // Bogus preshader PRSI data
+            goto parsePreshader_notAPreshader;
+
+        //const uint32 first_output_reg = SWAP32(prsi.tokens[1]);
+        // !!! FIXME: there are a lot of fields here I don't know about.
+        // !!! FIXME:  maybe [2] and [3] are for int4 and bool registers?
+        //const uint32 output_reg_count = SWAP32(prsi.tokens[4]);
+        // !!! FIXME:  maybe [5] and [6] are for int4 and bool registers?
+        output_map_count = SWAP32(prsi.tokens[7]);
+
+        prsi.tokcount -= 8;
+        prsi.tokens += 8;
+
+        if (prsi.tokcount < ((output_map_count + 1) * 2))
+            // Bogus preshader PRSI data
+            goto parsePreshader_notAPreshader;
+
+        output_map = prsi.tokens;
+    }
+
+    // Now we'll figure out the CTAB...
+    CtabData ctabdata = { 0, 0, 0 };
+    parse_constant_table(&fillerContext, ctab.tokens - 1, ctab.tokcount * 4,
+                         version, 0, &ctabdata);
+
+    // preshader owns this now. Don't free it in this function.
+    preshader->symbol_count = ctabdata.symbol_count;
+    preshader->symbols = ctabdata.symbols;
+
+    if (!ctabdata.have_ctab) // Bogus preshader CTAB data
+        goto parsePreshader_notAPreshader;
+
+    // The FXLC block has the actual instructions...
+    uint32 opcode_count = SWAP32(fxlc.tokens[1]);
+
+    size_t len = sizeof (MOJOSHADER_preshaderInstruction) * opcode_count;
+    preshader->instruction_count = (unsigned int) opcode_count;
+    preshader->instructions = (MOJOSHADER_preshaderInstruction *)
+                                m(len, d);
+    if (preshader->instructions == NULL)
+        goto parsePreshader_outOfMemory;
+    memset(preshader->instructions, '\0', len);
+
+    fxlc.tokens += 2;
+    fxlc.tokcount -= 2;
+    if (opcode_count > (fxlc.tokcount / 2)) // Bogus preshader FXLC block
+        goto parsePreshader_notAPreshader;
+
+    MOJOSHADER_preshaderInstruction *inst = preshader->instructions;
+    while (opcode_count--)
+    {
+        const uint32 opcodetok = SWAP32(fxlc.tokens[0]);
+        MOJOSHADER_preshaderOpcode opcode = MOJOSHADER_PRESHADEROP_NOP;
+        switch ((opcodetok >> 16) & 0xFFFF)
+        {
+            case 0x1000: opcode = MOJOSHADER_PRESHADEROP_MOV; break;
+            case 0x1010: opcode = MOJOSHADER_PRESHADEROP_NEG; break;
+            case 0x1030: opcode = MOJOSHADER_PRESHADEROP_RCP; break;
+            case 0x1040: opcode = MOJOSHADER_PRESHADEROP_FRC; break;
+            case 0x1050: opcode = MOJOSHADER_PRESHADEROP_EXP; break;
+            case 0x1060: opcode = MOJOSHADER_PRESHADEROP_LOG; break;
+            case 0x1070: opcode = MOJOSHADER_PRESHADEROP_RSQ; break;
+            case 0x1080: opcode = MOJOSHADER_PRESHADEROP_SIN; break;
+            case 0x1090: opcode = MOJOSHADER_PRESHADEROP_COS; break;
+            case 0x10A0: opcode = MOJOSHADER_PRESHADEROP_ASIN; break;
+            case 0x10B0: opcode = MOJOSHADER_PRESHADEROP_ACOS; break;
+            case 0x10C0: opcode = MOJOSHADER_PRESHADEROP_ATAN; break;
+            case 0x2000: opcode = MOJOSHADER_PRESHADEROP_MIN; break;
+            case 0x2010: opcode = MOJOSHADER_PRESHADEROP_MAX; break;
+            case 0x2020: opcode = MOJOSHADER_PRESHADEROP_LT; break;
+            case 0x2030: opcode = MOJOSHADER_PRESHADEROP_GE; break;
+            case 0x2040: opcode = MOJOSHADER_PRESHADEROP_ADD; break;
+            case 0x2050: opcode = MOJOSHADER_PRESHADEROP_MUL; break;
+            case 0x2060: opcode = MOJOSHADER_PRESHADEROP_ATAN2; break;
+            case 0x2080: opcode = MOJOSHADER_PRESHADEROP_DIV; break;
+            case 0x3000: opcode = MOJOSHADER_PRESHADEROP_CMP; break;
+            case 0x3010: opcode = MOJOSHADER_PRESHADEROP_MOVC; break;
+            case 0x5000: opcode = MOJOSHADER_PRESHADEROP_DOT; break;
+            case 0x5020: opcode = MOJOSHADER_PRESHADEROP_NOISE; break;
+            case 0xA000: opcode = MOJOSHADER_PRESHADEROP_MIN_SCALAR; break;
+            case 0xA010: opcode = MOJOSHADER_PRESHADEROP_MAX_SCALAR; break;
+            case 0xA020: opcode = MOJOSHADER_PRESHADEROP_LT_SCALAR; break;
+            case 0xA030: opcode = MOJOSHADER_PRESHADEROP_GE_SCALAR; break;
+            case 0xA040: opcode = MOJOSHADER_PRESHADEROP_ADD_SCALAR; break;
+            case 0xA050: opcode = MOJOSHADER_PRESHADEROP_MUL_SCALAR; break;
+            case 0xA060: opcode = MOJOSHADER_PRESHADEROP_ATAN2_SCALAR; break;
+            case 0xA080: opcode = MOJOSHADER_PRESHADEROP_DIV_SCALAR; break;
+            case 0xD000: opcode = MOJOSHADER_PRESHADEROP_DOT_SCALAR; break;
+            case 0xD020: opcode = MOJOSHADER_PRESHADEROP_NOISE_SCALAR; break;
+            default:
+                // Unknown preshader opcode
+                goto parsePreshader_notAPreshader;
+        } // switch
+
+        uint32 operand_count = SWAP32(fxlc.tokens[1]) + 1;  // +1 for dest.
+
+        inst->opcode = opcode;
+        inst->element_count = (unsigned int) (opcodetok & 0xFF);
+        inst->operand_count = (unsigned int) operand_count;
+
+        fxlc.tokens += 2;
+        fxlc.tokcount -= 2;
+        if ((operand_count * 3) > fxlc.tokcount)
+            // Bogus preshader FXLC block
+            goto parsePreshader_notAPreshader;
+
+        MOJOSHADER_preshaderOperand *operand = inst->operands;
+        while (operand_count--)
+        {
+            const unsigned int item = (unsigned int) SWAP32(fxlc.tokens[2]);
+
+            // !!! FIXME: don't know what first token does.
+            switch (SWAP32(fxlc.tokens[1]))
+            {
+                case 1:  // literal from CLIT block.
+                {
+                    if ((item + inst->element_count) >= preshader->literal_count)
+                        // Bogus preshader literal index
+                        goto parsePreshader_notAPreshader;
+                    operand->type = MOJOSHADER_PRESHADEROPERAND_LITERAL;
+                    break;
+                } // case
+
+                case 2:  // item from ctabdata.
+                {
+                    int i;
+                    MOJOSHADER_symbol *sym = ctabdata.symbols;
+                    for (i = 0; i < ctabdata.symbol_count; i++, sym++)
+                    {
+                        const uint32 base = sym->register_index * 4;
+                        const uint32 count = sym->register_count * 4;
+                        assert(sym->register_set==MOJOSHADER_SYMREGSET_FLOAT4);
+                        if ( (base <= item) && ((base + count) >= (item + inst->element_count)) )
+                            break;
+                    } // for
+                    if (i == ctabdata.symbol_count)
+                        // Bogus preshader input index
+                        goto parsePreshader_notAPreshader;
+                    operand->type = MOJOSHADER_PRESHADEROPERAND_INPUT;
+                    break;
+                } // case
+
+                case 4:
+                {
+                    if (!prsi.seen)
+                        // No PRSI tokens, no output map.
+                        goto parsePreshader_notAPreshader;
+                    int i;
+                    for (i = 0; i < output_map_count; i++)
+                    {
+                        const uint32 base = output_map[(i*2)] * 4;
+                        const uint32 count = output_map[(i*2)+1] * 4;
+                        if ( (base <= item) && ((base + count) >= (item + inst->element_count)) )
+                            break;
+                    } // for
+                    if (i == output_map_count)
+                        // Bogus preshader output index
+                        goto parsePreshader_notAPreshader;
+
+                    operand->type = MOJOSHADER_PRESHADEROPERAND_OUTPUT;
+                    break;
+                } // case
+
+                case 7:
+                {
+                    operand->type = MOJOSHADER_PRESHADEROPERAND_TEMP;
+                    if (item >= preshader->temp_count)
+                        preshader->temp_count = item + inst->element_count;
+                    break;
+                } // case
+            } // switch
+
+            operand->index = item;
+
+            fxlc.tokens += 3;
+            fxlc.tokcount -= 3;
+            operand++;
+        } // while
+
+        inst++;
+    } // while
+
+    return preshader;
+
+parsePreshader_notAPreshader:
+parsePreshader_outOfMemory:
+    MOJOSHADER_freePreshader(preshader, f, d);
     return NULL;
 } // MOJOSHADER_parsePreshader
 

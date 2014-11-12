@@ -743,6 +743,7 @@ const MOJOSHADER_parseData *MOJOSHADER_parse(const char *profile,
 const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                                                       const unsigned int len,
                                                       MOJOSHADER_malloc m,
+                                                      MOJOSHADER_free f,
                                                       void *d);
 
 
