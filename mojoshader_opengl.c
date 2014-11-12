@@ -2780,7 +2780,6 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                                   unsigned int pass)
 {
     int i, j;
-    int numStates = 0;
     MOJOSHADER_effectState *state;
     MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
     MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
@@ -2807,8 +2806,6 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
             for (j = 0; j < glEffect->num_shaders; j++)
                 if (*state->value.valuesI == glEffect->shader_indices[j])
                     fragShader = &glEffect->shaders[j];
-        else
-            numStates++;
     } // for
 
     glEffect->effect->state_changes->render_state_changes = curPass->states;
