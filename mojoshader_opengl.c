@@ -2764,14 +2764,14 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect)
 
 void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
                               unsigned int *numPasses,
-                              MOJOSHADER_effectSaveState saveState,
+                              int saveShaderState,
                               MOJOSHADER_effectStateChanges *stateChanges)
 {
     *numPasses = glEffect->effect->techniques[glEffect->effect->current_technique].pass_count;
-    glEffect->effect->save_state = saveState;
+    glEffect->effect->restore_shader_state = saveShaderState;
     glEffect->effect->state_changes = stateChanges;
 
-    if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVESHADERSTATE))
+    if (glEffect->effect->restore_shader_state)
         glEffect->prev_program = ctx->bound_program;
 } // MOJOSHADER_glEffectBegin
 
@@ -2780,6 +2780,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                                   unsigned int pass)
 {
     int i, j;
+    int numStates = 0;
     MOJOSHADER_effectState *state;
     MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
     MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
@@ -2791,7 +2792,6 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     for (i = 0; i < curPass->state_count; i++)
     {
         state = &curPass->states[i];
-        // TODO: All render states!
         if (state->type == MOJOSHADER_RS_VERTEXSHADER)
             for (j = 0; j < glEffect->num_shaders; j++)
                 if (*state->value.valuesI == glEffect->shader_indices[j])
@@ -2800,7 +2800,13 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
             for (j = 0; j < glEffect->num_shaders; j++)
                 if (*state->value.valuesI == glEffect->shader_indices[j])
                     fragShader = &glEffect->shaders[j];
+        else
+            numStates++;
     } // for
+
+    // TODO: Render states -flibit
+
+    // TODO: Sampler states -flibit
 
     MOJOSHADER_glBindShaders(vertShader, fragShader);
 } // MOJOSHADER_glEffectBeginPass
@@ -2814,16 +2820,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 
 void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffect)
 {
-    if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVERENDERSTATE))
-    {
-        // TODO -flibit
-    } // if
-
-    if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVESAMPLERSTATE))
-    {
-        // TODO -flibit
-    } // if
-
     assert(glEffect->effect->current_pass != -1);
     glEffect->effect->current_pass = -1;
 } // MOJOSHADER_glEffectEndPass
@@ -2831,10 +2827,12 @@ void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffect)
 
 void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect)
 {
-    if (!(glEffect->effect->save_state & MOJOSHADER_DONOTSAVESHADERSTATE))
+    if (glEffect->effect->restore_shader_state)
+    {
+        glEffect->effect->restore_shader_state = 0;
         MOJOSHADER_glBindProgram(glEffect->prev_program);
+    }
 
-    glEffect->effect->save_state = 0;
     glEffect->effect->state_changes = NULL;
 } // MOJOSHADER_glEffectEnd
 

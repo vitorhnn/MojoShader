@@ -435,18 +435,7 @@ typedef union MOJOSHADER_effectObject
 } MOJOSHADER_effectObject;
 
 
-/* Effect render state structures... */
-
-/* Used to select which render states should be preserved by the effect pass */
-typedef enum MOJOSHADER_effectSaveState
-{
-    MOJOSHADER_DONOTSAVERENDERSTATE  = 0x00000001,
-    MOJOSHADER_DONOTSAVESHADERSTATE  = 0x00000002,
-    MOJOSHADER_DONOTSAVESAMPLERSTATE = 0x00000004
-} MOJOSHADER_effectSaveState;
-
-/* Used to acquire the desired render state by the effect pass, and to restore
- * state changes introduced by the effect pass.
+/* Used to acquire the desired render state by the effect pass.
  */
 typedef struct MOJOSHADER_effectStateChanges
 {
@@ -531,9 +520,10 @@ typedef struct MOJOSHADER_effect
     MOJOSHADER_effectObject *objects;
 
     /*
-     * The current state change storage behavior requested by the application.
+     * Value used to determine whether or not to restore the previous shader
+     * state after rendering an effect, as requested by application.
      */
-    MOJOSHADER_effectSaveState save_state;
+    int restore_shader_state;
 
     /*
      * The structure provided by the appliation to store the state changes.
@@ -701,21 +691,20 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *effect);
  *  to pass in a MOJOSHADER_effectRenderState. Rather than change the render
  *  state within MojoShader itself we will simply provide what the effect wants
  *  and allow you to use this information with your own renderer.
+ *  MOJOSHADER_glEffectBeginPass will update with the render state desired by
+ *  the current effect pass.
  *
- * You should expect the renderState to change in the following ways:
- *  - MOJOSHADER_glEffectBeginPass will update with the render state desired by
- *    the current effect pass.
- *  - MOJOSHADER_glEffectEndPass will update with the restored render state,
- *    depending on what state was asked to be saved.
- *  - MOJOSHADER_effectEnd will restore the shader state, if the application
- *    requested that it be restored.
+ * Note that we only provide the ability to preserve the shader state, but NOT
+ * the ability to preserve the render/sampler states. You are expected to
+ * track your own GL state and restore these states as needed for your
+ * application.
  *
  * (glEffect) is a MOJOSHADER_glEffect* obtained from
  *  MOJOSHADER_glCompileEffect().
  * (numPasses) will be filled with the number of passes that this technique
  *  will need to fully render.
- * (saveState) is a flag informing the effect what rendering states to preserve
- *  after rendering the technique as well as each individual pass.
+ * (saveShaderState) is a boolean value informing the effect whether or not to
+ *  restore the shader bindings after calling MOJOSHADER_glEffectEnd.
  * (renderState) will be filled by the effect to inform you of the render state
  *  changes introduced by the technique and its passes.
  *
@@ -725,7 +714,7 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *effect);
  */
 void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
                               unsigned int *numPasses,
-                              MOJOSHADER_effectSaveState saveState,
+                              int saveShaderState,
                               MOJOSHADER_effectStateChanges *stateChanges);
 
 /* Begin an effect pass from the currently applied technique.
