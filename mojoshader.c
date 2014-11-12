@@ -9814,7 +9814,7 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                 {
                     if (!prsi.seen)
                         // No PRSI tokens, no output map.
-                        goto parsePreshader_notAPreshader;
+                        continue;
                     int i;
                     for (i = 0; i < output_map_count; i++)
                     {
