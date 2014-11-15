@@ -402,7 +402,8 @@ typedef struct MOJOSHADER_effectShader
     unsigned int technique;
     unsigned int pass;
     unsigned int is_preshader;
-    unsigned int preshader_output_param;
+    unsigned int param_count;
+    unsigned int *params;
     union
     {
         const MOJOSHADER_parseData *shader;

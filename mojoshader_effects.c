@@ -219,6 +219,17 @@ static char *readstring(const uint8 *base,
     return strptr;
 } // readstring
 
+static int findparameter(const MOJOSHADER_effectParam *params,
+                         const uint32 param_count,
+                         const char *name)
+{
+    int i;
+    for (i = 0; i < param_count; i++)
+        if (strcmp(name, params->value.name) == 0)
+            return i;
+    assert(0 && "Parameter not found!");
+}
+
 static void readvalue(const uint8 *base,
                       const uint32 typeoffset,
                       const uint32 valoffset,
@@ -625,9 +636,12 @@ static void readlargeobjects(const uint32 numlargeobjects,
                 const uint32 start = *((uint32 *) *ptr) + 4;
                 const uint32 end = 24; // FIXME: Why? -flibit
                 const char *array = readstring(*ptr, 0, m, d);
-                for (j = 0; j < effect->param_count; j++)
-                    if (strcmp(array, effect->params[j].value.name) == 0)
-                        object->shader.preshader_output_param = j;
+                object->shader.param_count = 1;
+                object->shader.params = (uint32 *) m(sizeof (uint32), d);
+                object->shader.params[0] = findparameter(effect->params,
+                                                         effect->param_count,
+                                                         array);
+                f((void *) array, d);
                 object->shader.preshader = MOJOSHADER_parsePreshader(*ptr + start, length - end,
                                                                      m, f, d);
                 // !!! FIXME: check for errors.
@@ -638,6 +652,12 @@ static void readlargeobjects(const uint32 numlargeobjects,
                                                          swiz, swizcount, smap, smapcount,
                                                          m, f, d);
                 // !!! FIXME: check for errors.
+                object->shader.param_count = object->shader.shader->symbol_count;
+                object->shader.params = m(object->shader.param_count * sizeof (uint32), d);
+                for (j = 0; j < object->shader.param_count; j++)
+                    object->shader.params[j] = findparameter(effect->params,
+                                                             effect->param_count,
+                                                             object->shader.shader->symbols[j].name);
             }
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
@@ -857,10 +877,13 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
         MOJOSHADER_effectObject *object = &effect->objects[i];
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
+        {
             if (object->shader.is_preshader)
                 MOJOSHADER_freePreshader(object->shader.preshader, f, d);
             else
                 MOJOSHADER_freeParseData(object->shader.shader);
+            f((void *) object->shader.params, d);
+        } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER2D
