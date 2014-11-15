@@ -2848,15 +2848,16 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             for (i = 0; i < raw->shader->symbol_count; i++) \
             { \
                 MOJOSHADER_symbol *sym = &raw->shader->symbols[i]; \
-                void *data = glEffect->effect->params[raw->params[i]].value.values; \
+                MOJOSHADER_effectParam *param = &glEffect->effect->params[raw->params[i]]; \
+                void *data = param->value.values; \
                 uint32 start = sym->register_index; \
-                uint32 len = sym->register_count; \
+                uint32 len = sym->register_count * param->value.value_count; \
                 if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
-                    memcpy(data, ctx->regb + start, len); \
+                    memcpy(ctx->regb + start, data, len); \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                    memcpy(data, ctx->regi + (start * 4), len * 4); \
+                    memcpy(ctx->regi + (start * 4), data, len * 4); \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                    memcpy(data, ctx->regf + (start * 4), len * 4); \
+                    memcpy(ctx->regf + (start * 4), data, len * 4); \
             } // for
     COPY_PARAMETER_DATA(glEffect->current_vert_raw,
                         vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
