@@ -691,16 +691,16 @@ static void readlargeobjects(const uint32 numlargeobjects,
     } // for
 } // readobjects
 
-const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
-                                                const unsigned char *buf,
-                                                const unsigned int _len,
-                                                const MOJOSHADER_swizzle *swiz,
-                                                const unsigned int swizcount,
-                                                const MOJOSHADER_samplerMap *smap,
-                                                const unsigned int smapcount,
-                                                MOJOSHADER_malloc m,
-                                                MOJOSHADER_free f,
-                                                void *d)
+MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
+                                          const unsigned char *buf,
+                                          const unsigned int _len,
+                                          const MOJOSHADER_swizzle *swiz,
+                                          const unsigned int swizcount,
+                                          const MOJOSHADER_samplerMap *smap,
+                                          const unsigned int smapcount,
+                                          MOJOSHADER_malloc m,
+                                          MOJOSHADER_free f,
+                                          void *d)
 {
     const uint8 *ptr = (const uint8 *) buf;
     uint32 len = (uint32) _len;
