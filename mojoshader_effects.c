@@ -225,7 +225,7 @@ static int findparameter(const MOJOSHADER_effectParam *params,
 {
     int i;
     for (i = 0; i < param_count; i++)
-        if (strcmp(name, params->value.name) == 0)
+        if (strcmp(name, params[i].value.name) == 0)
             return i;
     assert(0 && "Parameter not found!");
 }
