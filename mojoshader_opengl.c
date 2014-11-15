@@ -2813,6 +2813,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
         #define ASSIGN_SHADER(stype, raw, gls) \
             (state->type == stype) \
                 for (j = 0; j < glEffect->num_shaders; j++) \
+                { \
                     if (*state->value.valuesI == glEffect->shader_indices[j]) \
                     { \
                         raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
@@ -2820,7 +2821,9 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                             assert(0 && "TODO: Standalone preshader support!"); \
                         else \
                             gls = &glEffect->shaders[j]; \
-                    } // if
+                        break; \
+                    } \
+                }
         if ASSIGN_SHADER(MOJOSHADER_RS_VERTEXSHADER, rawVert, vertShader)
         else if ASSIGN_SHADER(MOJOSHADER_RS_PIXELSHADER, rawFrag, fragShader)
         #undef ASSIGN_SHADER
@@ -2866,7 +2869,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     #undef COPY_PARAMETER_DATA
 
     ctx->generation++;
-    MOJOSHADER_glProgramReady();
 } // MOJOSHADER_glEffectCommitChanges
 
 
