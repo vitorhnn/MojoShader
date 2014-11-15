@@ -2783,8 +2783,8 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 {
     int i, j;
     MOJOSHADER_effectState *state;
-    MOJOSHADER_effectShader *rawVert = NULL;
-    MOJOSHADER_effectShader *rawFrag = NULL;
+    MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
+    MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
     MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
     MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
 
