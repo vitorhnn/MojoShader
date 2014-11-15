@@ -2725,7 +2725,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
-            if (!ctx->profileCompileShader(object->shader.shader, &shader));
+            if (!ctx->profileCompileShader(object->shader.shader, &shader))
                 goto compile_shader_fail;
             retval->shaders[current_shader].parseData = object->shader.shader;
             retval->shaders[current_shader].handle = shader;
@@ -2759,7 +2759,8 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect)
         ctx->profileDeleteShader(glEffect->shaders[i].handle);
 
     f(glEffect->shader_indices, d);
-    f(glEffect->shaders, d);
+    // !!! FIXME: This gets deleted later, but only if the shader was bound.
+    // f(glEffect->shaders, d);
     f(glEffect, d);
 } // MOJOSHADER_glDeleteEffect
 
@@ -2785,8 +2786,14 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     MOJOSHADER_effectState *state;
     MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
     MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
-    MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
-    MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
+    MOJOSHADER_glShader *vertShader = NULL;
+    MOJOSHADER_glShader *fragShader = NULL;
+
+    if (ctx->bound_program != NULL)
+    {
+        vertShader = ctx->bound_program->vertex;
+        fragShader = ctx->bound_program->fragment;
+    } // if
 
     /* TODO: Used for sampler state change storage
     MOJOSHADER_malloc m = glEffect->effect->malloc;

@@ -770,6 +770,10 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                    &retval->techniques, retval->objects,
                    m, d);
 
+    /* Initial effect technique/pass */
+    retval->current_technique = &retval->techniques[0];
+    retval->current_pass = -1;
+
     if (len < 8)
         goto parseEffect_unexpectedEOF;
 
