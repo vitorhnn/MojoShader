@@ -934,9 +934,9 @@ void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
 } // MOJOSHADER_effectSetRawValueName
 
 
-MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect)
+const MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect)
 {
-    return &effect->techniques[effect->current_technique];
+    return effect->current_technique;
 } // MOJOSHADER_effectGetCurrentTechnique
 
 
@@ -948,7 +948,7 @@ void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
     {
         if (technique == &effect->techniques[i])
         {
-            effect->current_technique = i;
+            effect->current_technique = technique;
             return;
         } // if
     } // for
@@ -956,8 +956,8 @@ void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
 } // MOJOSHADER_effectSetTechnique
 
 
-MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
-                                                                    const MOJOSHADER_effectTechnique *technique
+const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextTechnique(const MOJOSHADER_effect *effect,
+                                                                     const MOJOSHADER_effectTechnique *technique
 )
 {
     int i;

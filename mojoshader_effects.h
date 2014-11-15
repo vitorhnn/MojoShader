@@ -505,9 +505,9 @@ typedef struct MOJOSHADER_effect
     MOJOSHADER_effectTechnique *techniques;
 
     /*
-     * The index of the current technique being rendered by this effect.
+     * The technique currently being rendered by this effect.
      */
-    int current_technique;
+    const MOJOSHADER_effectTechnique *current_technique;
 
     /*
      * The index of the current pass being rendered by this effect.
@@ -624,7 +624,7 @@ void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
  *
  * This function is thread safe.
  */
-MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect);
+const MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect);
 
 /* Set the current technique to be used an effect.
  *

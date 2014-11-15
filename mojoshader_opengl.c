@@ -2668,6 +2668,8 @@ struct MOJOSHADER_glEffect
     unsigned int num_shaders;
     MOJOSHADER_glShader *shaders;
     unsigned int *shader_indices;
+    MOJOSHADER_effectShader *current_vert_raw;
+    MOJOSHADER_effectShader *current_frag_raw;
     MOJOSHADER_glProgram *prev_program;
 };
 
@@ -2767,7 +2769,7 @@ void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
                               int saveShaderState,
                               MOJOSHADER_effectStateChanges *stateChanges)
 {
-    *numPasses = glEffect->effect->techniques[glEffect->effect->current_technique].pass_count;
+    *numPasses = glEffect->effect->current_technique->pass_count;
     glEffect->effect->restore_shader_state = saveShaderState;
     glEffect->effect->state_changes = stateChanges;
 
@@ -2781,6 +2783,8 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 {
     int i, j;
     MOJOSHADER_effectState *state;
+    MOJOSHADER_effectShader *rawVert = NULL;
+    MOJOSHADER_effectShader *rawFrag = NULL;
     MOJOSHADER_glShader *vertShader = ctx->bound_program->vertex;
     MOJOSHADER_glShader *fragShader = ctx->bound_program->fragment;
 
@@ -2790,37 +2794,70 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     void *d = glEffect->effect->malloc_data;
     */
 
-    MOJOSHADER_effectPass *curPass = &glEffect->effect->techniques[glEffect->effect->current_technique].passes[pass];
+    MOJOSHADER_effectPass *curPass = &glEffect->effect->current_technique->passes[pass];
 
     assert(glEffect->effect->current_pass == -1);
     glEffect->effect->current_pass = pass;
 
+    // !!! FIXME: I bet this could be stored at parse/compile time. -flibit
     for (i = 0; i < curPass->state_count; i++)
     {
         state = &curPass->states[i];
-        if (state->type == MOJOSHADER_RS_VERTEXSHADER)
-            for (j = 0; j < glEffect->num_shaders; j++)
-                if (*state->value.valuesI == glEffect->shader_indices[j])
-                    vertShader = &glEffect->shaders[j];
-        else if (state->type == MOJOSHADER_RS_PIXELSHADER)
-            for (j = 0; j < glEffect->num_shaders; j++)
-                if (*state->value.valuesI == glEffect->shader_indices[j])
-                    fragShader = &glEffect->shaders[j];
+        #define ASSIGN_SHADER(stype, raw, gls) \
+            (state->type == stype) \
+                for (j = 0; j < glEffect->num_shaders; j++) \
+                    if (*state->value.valuesI == glEffect->shader_indices[j]) \
+                    { \
+                        raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
+                        if (raw->is_preshader) \
+                            assert(0 && "TODO: Standalone preshader support!"); \
+                        else \
+                            gls = &glEffect->shaders[j]; \
+                    } // if
+        if ASSIGN_SHADER(MOJOSHADER_RS_VERTEXSHADER, rawVert, vertShader)
+        else if ASSIGN_SHADER(MOJOSHADER_RS_PIXELSHADER, rawFrag, fragShader)
+        #undef ASSIGN_SHADER
     } // for
 
     glEffect->effect->state_changes->render_state_changes = curPass->states;
     glEffect->effect->state_changes->render_state_change_count = curPass->state_count;
 
-    // TODO: Map effect parameters to shader uniforms -flibit
     // TODO: Sampler states -flibit
 
+    glEffect->current_vert_raw = rawVert;
+    glEffect->current_frag_raw = rawFrag;
     MOJOSHADER_glBindShaders(vertShader, fragShader);
+    MOJOSHADER_glEffectCommitChanges(glEffect);
 } // MOJOSHADER_glEffectBeginPass
 
 
 void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 {
-    // TODO -flibit
+    int i;
+
+    // !!! FIXME: We're just copying everything every time. Blech. -flibit
+    #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
+        if (raw != NULL) \
+            for (i = 0; i < raw->shader->symbol_count; i++) \
+            { \
+                MOJOSHADER_symbol *sym = &raw->shader->symbols[i]; \
+                void *data = glEffect->effect->params[raw->params[i]].value.values; \
+                uint32 start = sym->register_index; \
+                uint32 len = sym->register_count; \
+                if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
+                    memcpy(data, ctx->regb + start, len); \
+                else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
+                    memcpy(data, ctx->regi + (start * 4), len * 4); \
+                else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
+                    memcpy(data, ctx->regf + (start * 4), len * 4); \
+            } // for
+    COPY_PARAMETER_DATA(glEffect->current_vert_raw,
+                        vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
+    COPY_PARAMETER_DATA(glEffect->current_frag_raw,
+                        ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
+    #undef COPY_PARAMETER_DATA
+
+    MOJOSHADER_glProgramReady();
 } // MOJOSHADER_glEffectCommitChanges
 
 
