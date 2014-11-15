@@ -514,7 +514,7 @@ static void readtechniques(const uint32 numtechniques,
 static void readsmallobjects(const uint32 numsmallobjects,
                              const uint8 **ptr,
                              uint32 *len,
-                             MOJOSHADER_effectObject *objects,
+                             MOJOSHADER_effect *effect,
                              const char *profile,
                              const MOJOSHADER_swizzle *swiz,
                              const unsigned int swizcount,
@@ -524,7 +524,7 @@ static void readsmallobjects(const uint32 numsmallobjects,
                              MOJOSHADER_free f,
                              void *d)
 {
-    int i;
+    int i, j;
     if (numsmallobjects == 0) return;
 
     for (i = 1; i < numsmallobjects + 1; i++)
@@ -532,7 +532,7 @@ static void readsmallobjects(const uint32 numsmallobjects,
         const uint32 index = readui32(ptr, len);
         const uint32 length = readui32(ptr, len);
 
-        MOJOSHADER_effectObject *object = &objects[index];
+        MOJOSHADER_effectObject *object = &effect->objects[index];
         if (object->type == MOJOSHADER_SYMTYPE_STRING)
         {
             if (length > 0)
@@ -572,6 +572,12 @@ static void readsmallobjects(const uint32 numsmallobjects,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
             // !!! FIXME: check for errors.
+            object->shader.param_count = object->shader.shader->symbol_count;
+            object->shader.params = m(object->shader.param_count * sizeof (uint32), d);
+            for (j = 0; j < object->shader.param_count; j++)
+                object->shader.params[j] = findparameter(effect->params,
+                                                         effect->param_count,
+                                                         object->shader.shader->symbols[j].name);
         } // else if
         else
         {
@@ -773,7 +779,7 @@ const MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
     /* Parse "small" object table */
     readsmallobjects(numsmallobjects, &ptr, &len,
-                     retval->objects,
+                     retval,
                      profile, swiz, swizcount, smap, smapcount,
                      m, f, d);
 
