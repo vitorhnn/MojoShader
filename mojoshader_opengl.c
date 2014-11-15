@@ -2865,6 +2865,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
     #undef COPY_PARAMETER_DATA
 
+    ctx->generation++;
     MOJOSHADER_glProgramReady();
 } // MOJOSHADER_glEffectCommitChanges
 
