@@ -2843,7 +2843,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 
 void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 {
-    int i;
+    int i, j;
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
@@ -2856,7 +2856,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 uint32 start = sym->register_index; \
                 uint32 len = sym->register_count * param->value.value_count; \
                 if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
-                    memcpy(ctx->regb + start, data, len); \
+                    for (j = 0; j < len; j++) \
+                        ctx->regb[start + j] = ((uint32 *) data)[j]; \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
                     memcpy(ctx->regi + (start * 4), data, len * 4); \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \

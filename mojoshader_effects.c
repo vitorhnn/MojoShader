@@ -399,7 +399,6 @@ static void readparameters(const uint32 numparams,
         readvalue(base, typeoffset, valoffset,
                   &param->value, objects,
                   m, d);
-
     } // for
 } // readparameters
 
