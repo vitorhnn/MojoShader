@@ -2886,7 +2886,7 @@ void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect)
     {
         glEffect->effect->restore_shader_state = 0;
         MOJOSHADER_glBindProgram(glEffect->prev_program);
-    }
+    } // if
 
     glEffect->effect->state_changes = NULL;
 } // MOJOSHADER_glEffectEnd
