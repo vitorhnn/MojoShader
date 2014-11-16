@@ -2486,37 +2486,7 @@ void MOJOSHADER_glProgramReady(void)
         GLfloat *dstf = program->vs_uniforms_float4;
         GLint *dsti = program->vs_uniforms_int4;
         GLint *dstb = program->vs_uniforms_bool;
-        const MOJOSHADER_preshader *preshader = NULL;
         uint32 i;
-
-        // !!! FIXME: shouldn't this run even if the generation hasn't changed?
-        #if SUPPORT_PRESHADERS
-        int ran_preshader = 0;
-        if (program->vertex)
-        {
-            preshader = program->vertex->parseData->preshader;
-            if (preshader)
-            {
-                MOJOSHADER_runPreshader(preshader, program->vs_preshader_regs,
-                                        ctx->vs_reg_file_f);
-                ran_preshader = 1;
-            } // if
-        } // if
-
-        if (program->fragment)
-        {
-            preshader = program->fragment->parseData->preshader;
-            if (preshader)
-            {
-                MOJOSHADER_runPreshader(preshader, program->ps_preshader_regs,
-                                        ctx->ps_reg_file_f);
-                ran_preshader = 1;
-            } // if
-        } // if
-
-        if (ran_preshader)
-            ctx->generation++;
-        #endif
 
         for (i = 0; i < count; i++)
         {
@@ -2839,6 +2809,8 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 {
     int i, j;
+    MOJOSHADER_preshader *preshader;
+    MOJOSHADER_glProgram *program = ctx->bound_program;
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
@@ -2863,6 +2835,21 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     COPY_PARAMETER_DATA(glEffect->current_frag_raw,
                         ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
     #undef COPY_PARAMETER_DATA
+
+    // !!! FIXME: We're just running the preshader every time. Blech. -flibit
+    if (program->vertex)
+    {
+        preshader = program->vertex->parseData->preshader;
+        if (preshader)
+            MOJOSHADER_runPreshader(preshader, program->vs_preshader_regs,
+                                    ctx->vs_reg_file_f);
+    } // if
+    if (program->fragment)
+    {
+        preshader = program->fragment->parseData->preshader;
+            MOJOSHADER_runPreshader(preshader, program->ps_preshader_regs,
+                                    ctx->ps_reg_file_f);
+    } // if
 
     ctx->generation++;
 } // MOJOSHADER_glEffectCommitChanges
