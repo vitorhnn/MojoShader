@@ -510,6 +510,27 @@ static void readtechniques(const uint32 numtechniques,
     } // for
 } // readtechniques
 
+#define FOREACH_SYMBOL(paramOp, samplerOp) \
+    for (j = 0; j < object->shader.shader->symbol_count; j++) \
+    { \
+        int par = findparameter(effect->params, \
+                                effect->param_count, \
+                                object->shader.shader->symbols[j].name); \
+        MOJOSHADER_symbolType typ = effect->params[par].value.value_type; \
+        if (typ == MOJOSHADER_SYMTYPE_SAMPLER \
+         || typ == MOJOSHADER_SYMTYPE_SAMPLER1D \
+         || typ == MOJOSHADER_SYMTYPE_SAMPLER2D \
+         || typ == MOJOSHADER_SYMTYPE_SAMPLER3D \
+         || typ == MOJOSHADER_SYMTYPE_SAMPLERCUBE) \
+        { \
+            samplerOp; \
+        } \
+        else \
+        { \
+            paramOp; \
+        } \
+    } // for
+
 static void readsmallobjects(const uint32 numsmallobjects,
                              const uint8 **ptr,
                              uint32 *len,
@@ -571,12 +592,17 @@ static void readsmallobjects(const uint32 numsmallobjects,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
             // !!! FIXME: check for errors.
-            object->shader.param_count = object->shader.shader->symbol_count;
+            FOREACH_SYMBOL(object->shader.param_count++,
+                           object->shader.sampler_count++)
             object->shader.params = m(object->shader.param_count * sizeof (uint32), d);
-            for (j = 0; j < object->shader.param_count; j++)
-                object->shader.params[j] = findparameter(effect->params,
-                                                         effect->param_count,
-                                                         object->shader.shader->symbols[j].name);
+            object->shader.samplers = m(object->shader.sampler_count * sizeof (MOJOSHADER_samplerStateRegister), d);
+            uint32 curParam = 0;
+            uint32 curSampler = 0;
+            FOREACH_SYMBOL(object->shader.params[curParam++] = par,
+                           object->shader.samplers[curSampler].sampler_register = object->shader.shader->symbols[j].register_index;
+                           object->shader.samplers[curSampler].sampler_state_count = effect->params[par].value.value_count;
+                           object->shader.samplers[curSampler].sampler_states = effect->params[par].value.valuesSS;
+                           curSampler++;)
         } // else if
         else
         {
@@ -657,12 +683,17 @@ static void readlargeobjects(const uint32 numlargeobjects,
                                                          swiz, swizcount, smap, smapcount,
                                                          m, f, d);
                 // !!! FIXME: check for errors.
-                object->shader.param_count = object->shader.shader->symbol_count;
+                FOREACH_SYMBOL(object->shader.param_count++,
+                               object->shader.sampler_count++)
                 object->shader.params = m(object->shader.param_count * sizeof (uint32), d);
-                for (j = 0; j < object->shader.param_count; j++)
-                    object->shader.params[j] = findparameter(effect->params,
-                                                             effect->param_count,
-                                                             object->shader.shader->symbols[j].name);
+                object->shader.samplers = m(object->shader.sampler_count * sizeof (MOJOSHADER_samplerStateRegister), d);
+                uint32 curParam = 0;
+                uint32 curSampler = 0;
+                FOREACH_SYMBOL(object->shader.params[curParam++] = par,
+                               object->shader.samplers[curSampler].sampler_register = object->shader.shader->symbols[j].register_index;
+                               object->shader.samplers[curSampler].sampler_state_count = effect->params[par].value.value_count;
+                               object->shader.samplers[curSampler].sampler_states = effect->params[par].value.valuesSS;
+                               curSampler++;)
             }
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
@@ -689,6 +720,8 @@ static void readlargeobjects(const uint32 numlargeobjects,
         *len -= blocklen;
     } // for
 } // readobjects
+
+#undef FOREACH_SYMBOL
 
 MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                                           const unsigned char *buf,
@@ -892,6 +925,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
             else
                 MOJOSHADER_freeParseData(object->shader.shader);
             f((void *) object->shader.params, d);
+            f((void *) object->shader.samplers, d);
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D

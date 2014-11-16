@@ -396,6 +396,9 @@ typedef struct MOJOSHADER_effectTechnique
 
 /* Effect "objects"... */
 
+/* Defined later in the state change types... */
+typedef struct MOJOSHADER_samplerStateRegister MOJOSHADER_samplerStateRegister;
+
 typedef struct MOJOSHADER_effectShader
 {
     MOJOSHADER_symbolType type;
@@ -404,6 +407,8 @@ typedef struct MOJOSHADER_effectShader
     unsigned int is_preshader;
     unsigned int param_count;
     unsigned int *params;
+    unsigned int sampler_count;
+    MOJOSHADER_samplerStateRegister *samplers;
     union
     {
         const MOJOSHADER_parseData *shader;
@@ -442,7 +447,18 @@ typedef union MOJOSHADER_effectObject
 } MOJOSHADER_effectObject;
 
 
-/* Used to acquire the desired render state by the effect pass.
+/* Effect state change types... */
+
+/* Used to store sampler states with accompanying sampler registers */
+typedef struct MOJOSHADER_samplerStateRegister
+{
+    unsigned int sampler_register;
+    unsigned int sampler_state_count;
+    const MOJOSHADER_effectSamplerState *sampler_states;
+} MOJOSHADER_samplerStateRegister;
+
+/*
+ * Used to acquire the desired render state by the effect pass.
  */
 typedef struct MOJOSHADER_effectStateChanges
 {
@@ -452,7 +468,7 @@ typedef struct MOJOSHADER_effectStateChanges
 
     /* Sampler state changes caused by effect technique */
     unsigned int sampler_state_change_count;
-    const MOJOSHADER_effectSamplerState *sampler_state_changes;
+    const MOJOSHADER_samplerStateRegister *sampler_state_changes;
 } MOJOSHADER_effectStateChanges;
 
 

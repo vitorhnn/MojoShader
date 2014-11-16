@@ -2783,6 +2783,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                                   unsigned int pass)
 {
     int i, j;
+    MOJOSHADER_effectPass *curPass;
     MOJOSHADER_effectState *state;
     MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
     MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
@@ -2795,16 +2796,9 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
         fragShader = ctx->bound_program->fragment;
     } // if
 
-    /* TODO: Used for sampler state change storage
-    MOJOSHADER_malloc m = glEffect->effect->malloc;
-    MOJOSHADER_free f = glEffect->effect->free;
-    void *d = glEffect->effect->malloc_data;
-    */
-
-    MOJOSHADER_effectPass *curPass = &glEffect->effect->current_technique->passes[pass];
-
     assert(glEffect->effect->current_pass == -1);
     glEffect->effect->current_pass = pass;
+    curPass = &glEffect->effect->current_technique->passes[pass];
 
     // !!! FIXME: I bet this could be stored at parse/compile time. -flibit
     for (i = 0; i < curPass->state_count; i++)
@@ -2832,7 +2826,8 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     glEffect->effect->state_changes->render_state_changes = curPass->states;
     glEffect->effect->state_changes->render_state_change_count = curPass->state_count;
 
-    // TODO: Sampler states -flibit
+    glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
+    glEffect->effect->state_changes->sampler_state_change_count = rawFrag->sampler_count;
 
     glEffect->current_vert_raw = rawVert;
     glEffect->current_frag_raw = rawFrag;
