@@ -720,8 +720,6 @@ static void readlargeobjects(const uint32 numlargeobjects,
     } // for
 } // readobjects
 
-#undef FOREACH_SYMBOL
-
 MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
                                           const unsigned char *buf,
                                           const unsigned int _len,
