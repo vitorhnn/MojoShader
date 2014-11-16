@@ -2845,7 +2845,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     #define COPY_PRESHADER_PARAMETER_DATA(raw, psreg, reg_file_f) \
         if (raw != NULL) \
         { \
-            preshader = raw->preshader; \
+            preshader = raw->shader->preshader; \
             if (preshader) \
             { \
                 for (i = 0; i < preshader->symbol_count; i++) \

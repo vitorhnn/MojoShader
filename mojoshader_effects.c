@@ -704,6 +704,17 @@ static void readlargeobjects(const uint32 numlargeobjects,
                         curSampler++;
                     } // if
                 } // for
+                if (object->shader.shader->preshader)
+                {
+                    object->shader.preshader_param_count = object->shader.shader->preshader->symbol_count;
+                    object->shader.preshader_params = m(object->shader.preshader_param_count * sizeof (uint32), d);
+                    for (j = 0; j < object->shader.shader->preshader->symbol_count; j++)
+                    {
+                        object->shader.preshader_params[j] = findparameter(effect->params,
+                                                                           effect->param_count,
+                                                                           object->shader.shader->preshader->symbols[j].name);
+                    } // for
+                } // if
             }
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
