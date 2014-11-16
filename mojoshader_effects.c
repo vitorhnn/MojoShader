@@ -592,6 +592,17 @@ static void readsmallobjects(const uint32 numsmallobjects,
                     curSampler++;
                 } // if
             } // for
+            if (object->shader.shader->preshader)
+            {
+                object->shader.preshader_param_count = object->shader.shader->preshader->symbol_count;
+                object->shader.preshader_params = m(object->shader.preshader_param_count * sizeof (uint32), d);
+                for (j = 0; j < object->shader.shader->preshader->symbol_count; j++)
+                {
+                    object->shader.preshader_params[j] = findparameter(effect->params,
+                                                                       effect->param_count,
+                                                                       object->shader.shader->preshader->symbols[j].name);
+                } // for
+            } // if
         } // else if
         else
         {
@@ -923,6 +934,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
                 MOJOSHADER_freeParseData(object->shader.shader);
             f((void *) object->shader.params, d);
             f((void *) object->shader.samplers, d);
+            f((void *) object->shader.preshader_params, d);
         } // if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D

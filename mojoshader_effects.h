@@ -405,6 +405,8 @@ typedef struct MOJOSHADER_effectShader
     unsigned int technique;
     unsigned int pass;
     unsigned int is_preshader;
+    unsigned int preshader_param_count;
+    unsigned int *preshader_params;
     unsigned int param_count;
     unsigned int *params;
     unsigned int sampler_count;

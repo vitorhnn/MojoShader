@@ -2809,7 +2809,12 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 {
     int i, j;
-    MOJOSHADER_preshader *preshader;
+    MOJOSHADER_symbol *sym;
+    MOJOSHADER_effectParam *param;
+    void *data;
+    uint32 start;
+    uint32 len;
+    const MOJOSHADER_preshader *preshader;
     MOJOSHADER_glProgram *program = ctx->bound_program;
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
@@ -2817,11 +2822,11 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
         if (raw != NULL) \
             for (i = 0; i < raw->shader->symbol_count; i++) \
             { \
-                MOJOSHADER_symbol *sym = &raw->shader->symbols[i]; \
-                MOJOSHADER_effectParam *param = &glEffect->effect->params[raw->params[i]]; \
-                void *data = param->value.values; \
-                uint32 start = sym->register_index; \
-                uint32 len = sym->register_count * param->value.value_count; \
+                sym = &raw->shader->symbols[i]; \
+                param = &glEffect->effect->params[raw->params[i]]; \
+                data = param->value.values; \
+                start = sym->register_index; \
+                len = sym->register_count * param->value.value_count; \
                 if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
                     for (j = 0; j < len; j++) \
                         ctx->regb[start + j] = ((uint32 *) data)[j]; \
@@ -2837,19 +2842,34 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     #undef COPY_PARAMETER_DATA
 
     // !!! FIXME: We're just running the preshader every time. Blech. -flibit
-    if (program->vertex)
-    {
-        preshader = program->vertex->parseData->preshader;
-        if (preshader)
-            MOJOSHADER_runPreshader(preshader, program->vs_preshader_regs,
-                                    ctx->vs_reg_file_f);
-    } // if
-    if (program->fragment)
-    {
-        preshader = program->fragment->parseData->preshader;
-            MOJOSHADER_runPreshader(preshader, program->ps_preshader_regs,
-                                    ctx->ps_reg_file_f);
-    } // if
+    #define COPY_PRESHADER_PARAMETER_DATA(raw, psreg, reg_file_f) \
+        if (raw != NULL) \
+        { \
+            preshader = raw->preshader; \
+            if (preshader) \
+            { \
+                for (i = 0; i < preshader->symbol_count; i++) \
+                { \
+                    sym = &preshader->symbols[i]; \
+                    param = &glEffect->effect->params[raw->preshader_params[i]]; \
+                    data = param->value.values; \
+                    start = sym->register_index; \
+                    len = sym->register_count * param->value.value_count; \
+                    if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
+                        for (j = 0; j < len; j++) \
+                            program->psreg[start + j] = ((uint32 *) data)[j]; \
+                    else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4 \
+                          || sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
+                        memcpy(program->psreg + (start * 4), data, len * 4); \
+                } \
+                MOJOSHADER_runPreshader(preshader, program->psreg, ctx->reg_file_f); \
+            } \
+        }
+    COPY_PRESHADER_PARAMETER_DATA(glEffect->current_vert_raw,
+                                  vs_preshader_regs, vs_reg_file_f);
+    COPY_PRESHADER_PARAMETER_DATA(glEffect->current_frag_raw,
+                                  ps_preshader_regs, ps_reg_file_f);
+    #undef COPY_PRESHADER_PARAMETER_DATA
 
     ctx->generation++;
 } // MOJOSHADER_glEffectCommitChanges
