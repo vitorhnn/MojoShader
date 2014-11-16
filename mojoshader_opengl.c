@@ -2783,12 +2783,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     data = param->value.values; \
                     start = sym->register_index; \
                     len = sym->register_count * param->value.value_count; \
-                    if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
-                        for (j = 0; j < len; j++) \
-                            program->psreg[start + j] = ((uint32 *) data)[j]; \
-                    else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4 \
-                          || sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                        memcpy(program->psreg + (start * 4), data, len * 4); \
+                    memcpy(program->psreg + (start * 4), data, len * 4); \
                 } \
                 MOJOSHADER_runPreshader(preshader, program->psreg, ctx->reg_file_f); \
             } \
