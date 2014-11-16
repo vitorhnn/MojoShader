@@ -2846,6 +2846,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             for (i = 0; i < raw->shader->symbol_count; i++) \
             { \
                 MOJOSHADER_symbol *sym = &raw->shader->symbols[i]; \
+                if (sym->register_set == MOJOSHADER_SYMREGSET_SAMPLER) \
+                    continue; \
                 MOJOSHADER_effectParam *param = &glEffect->effect->params[raw->params[i]]; \
                 void *data = param->value.values; \
                 uint32 start = sym->register_index; \
