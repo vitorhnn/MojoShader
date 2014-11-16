@@ -3045,24 +3045,6 @@ void MOJOSHADER_glSetVertexAttribute(MOJOSHADER_usage usage,
 void MOJOSHADER_glSetVertexAttribDivisor(MOJOSHADER_usage usage,
                                          int index, unsigned int divisor);
 
-
-
-/* These below functions are temporary and will be removed from the API once
-    the real Effects API is written. Do not use! */
-void MOJOSHADER_glSetVertexPreshaderUniformF(unsigned int idx, const float *data,
-                                             unsigned int vec4n);
-void MOJOSHADER_glGetVertexPreshaderUniformF(unsigned int idx, float *data,
-                                             unsigned int vec4n);
-void MOJOSHADER_glSetPixelPreshaderUniformF(unsigned int idx, const float *data,
-                                            unsigned int vec4n);
-void MOJOSHADER_glGetPixelPreshaderUniformF(unsigned int idx, float *data,
-                                            unsigned int vec4n);
-/* These above functions are temporary and will be removed from the API once
-    the real Effects API is written. Do not use! */
-
-
-
-
 /*
  * Inform MojoShader that it should commit any pending state to the GL. This
  *  must be called after you bind a program and update any inputs, right
