@@ -863,8 +863,16 @@ parseEffect_outOfMemory:
 
 void freevalue(MOJOSHADER_effectValue *value, MOJOSHADER_free f, void *d)
 {
+    int i;
     f((void *) value->name, d);
     f((void *) value->semantic, d);
+    if (value->value_type == MOJOSHADER_SYMTYPE_SAMPLER
+     || value->value_type == MOJOSHADER_SYMTYPE_SAMPLER1D
+     || value->value_type == MOJOSHADER_SYMTYPE_SAMPLER2D
+     || value->value_type == MOJOSHADER_SYMTYPE_SAMPLER3D
+     || value->value_type == MOJOSHADER_SYMTYPE_SAMPLERCUBE)
+        for (i = 0; i < value->value_count; i++)
+            freevalue(&value->valuesSS[i].value, f, d);
     f(value->values, d);
 } // freevalue
 
