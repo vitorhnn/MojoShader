@@ -9779,7 +9779,9 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
         {
             const unsigned int item = (unsigned int) SWAP32(fxlc.tokens[2]);
 
-            // !!! FIXME: don't know what first token does.
+            // !!! FIXME: Is this used anywhere other than INPUT? -flibit
+            const uint32 numArrays = SWAP32(fxlc.tokens[0]);
+
             switch (SWAP32(fxlc.tokens[1]))
             {
                 case 1:  // literal from CLIT block.
@@ -9807,6 +9809,21 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                         // Bogus preshader input index
                         goto parsePreshader_notAPreshader;
                     operand->type = MOJOSHADER_PRESHADEROPERAND_INPUT;
+                    if (numArrays > 0)
+                    {
+                        // Get each register base, indicating the arrays used.
+                        int j;
+                        for (j = 0; j < numArrays; j++)
+                        {
+                            const uint32 jmp = SWAP32(fxlc.tokens[4]);
+                            const uint32 bigjmp = (jmp >> 4) * 4;
+                            const uint32 ltljmp = (jmp >> 2) & 3;
+                            // TODO: Assign this... somewhere! -flibit
+                            printf("Array #%d: %d\n", i, bigjmp + ltljmp);
+                            fxlc.tokens += 2;
+                            fxlc.tokcount -= 2;
+                        } // for
+                    } // if
                     break;
                 } // case
 
@@ -9838,26 +9855,6 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                         preshader->temp_count = item + inst->element_count;
                     break;
                 } // case
-
-                default:
-                {
-                    /* We are accessing arrays! */
-                    operand->type = MOJOSHADER_PRESHADEROPERAND_INPUT;
-                    /* Get each register base, indicating the arrays used.
-                    const uint32 numArrays = item + 1;
-                    int i;
-                    for (i = 0; i < numArrays; i++)
-                    {
-                        const uint32 jmp = SWAP32(fxlc.tokens[1]);
-                        const uint32 bigjmp = (jmp >> 4) * 4;
-                        const uint32 ltljmp = (jmp >> 2) & 3;
-                        printf("Array #%d: %d\n", i, bigjmp + ltljmp);
-                        fxlc.tokens += 2;
-                        fxlc.tokcount -= 2;
-                    } // for
-                    */
-                    break;
-                } // default
             } // switch
 
             operand->index = item;
