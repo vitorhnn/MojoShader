@@ -428,6 +428,8 @@ typedef struct MOJOSHADER_preshaderOperand
 {
     MOJOSHADER_preshaderOperandType type;
     unsigned int index;
+    unsigned int array_register_count;
+    unsigned int *array_registers;
 } MOJOSHADER_preshaderOperand;
 
 typedef struct MOJOSHADER_preshaderInstruction

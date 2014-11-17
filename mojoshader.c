@@ -9550,6 +9550,7 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                                                       void *d)
 {
     // !!! FIXME: This is copypasta ripped from parse_preshader -flibit
+    int i;
 
     const uint32 *tokens = (const uint32 *) buf;
     uint32 tokcount = _len / 4;
@@ -9657,7 +9658,6 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
             if (preshader->literals == NULL)
                 goto parsePreshader_notAPreshader;  // oh well.
             const double *litptr = (const double *) (clit.tokens + 2);
-            int i;
             for (i = 0; i < lit_count; i++)
                 preshader->literals[i] = SWAPDBL(litptr[i]);
         } // else if
@@ -9795,7 +9795,6 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
 
                 case 2:  // item from ctabdata.
                 {
-                    int i;
                     MOJOSHADER_symbol *sym = ctabdata.symbols;
                     for (i = 0; i < ctabdata.symbol_count; i++, sym++)
                     {
@@ -9811,15 +9810,18 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                     operand->type = MOJOSHADER_PRESHADEROPERAND_INPUT;
                     if (numArrays > 0)
                     {
+                        // malloc the array symbol name array
+                        const uint32 siz = numArrays * sizeof (uint32);
+                        operand->array_register_count = numArrays;
+                        operand->array_registers = (uint32 *) m(siz, d);
+                        memset(operand->array_registers, '\0', siz);
                         // Get each register base, indicating the arrays used.
-                        int j;
-                        for (j = 0; j < numArrays; j++)
+                        for (i = 0; i < numArrays; i++)
                         {
                             const uint32 jmp = SWAP32(fxlc.tokens[4]);
                             const uint32 bigjmp = (jmp >> 4) * 4;
                             const uint32 ltljmp = (jmp >> 2) & 3;
-                            // TODO: Assign this... somewhere! -flibit
-                            printf("Array #%d: %d\n", i, bigjmp + ltljmp);
+                            operand->array_registers[i] = bigjmp + ltljmp;
                             fxlc.tokens += 2;
                             fxlc.tokcount -= 2;
                         } // for
@@ -9832,7 +9834,6 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                     if (!prsi.seen)
                         // No PRSI tokens, no output map.
                         continue;
-                    int i;
                     for (i = 0; i < output_map_count; i++)
                     {
                         const uint32 base = output_map[(i*2)] * 4;
@@ -9880,9 +9881,13 @@ void MOJOSHADER_freePreshader(const MOJOSHADER_preshader *preshader,
                               MOJOSHADER_free f,
                               void *d)
 {
+    int i, j;
     if (preshader != NULL)
     {
         f((void *) preshader->literals, d);
+        for (i = 0; i < preshader->instruction_count; i++)
+            for (j = 0; j < preshader->instructions[i].operand_count; j++)
+                f((void *) preshader->instructions[i].operands[j].array_registers, d);
         f((void *) preshader->instructions, d);
         free_symbols(f, d, preshader->symbols, preshader->symbol_count);
         f((void *) preshader, d);
