@@ -9841,16 +9841,23 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
 
                 default:
                 {
-                    /* This aligns with the first array's register. WHAT.
-                    uint32 bigJump = SWAP32(fxlc.tokens[1]) >> 4;
-                    uint32 smallJump = (SWAP32(fxlc.tokens[1]) >> 2) & 3;
-                    uint32 regBase = (bigJump * 4) + smallJump;
-                    printf("Array register index: %d\n", regBase);
+                    /* We are accessing arrays! */
+                    operand->type = MOJOSHADER_PRESHADEROPERAND_INPUT;
+                    /* Get each register base, indicating the arrays used.
+                    const uint32 numArrays = item + 1;
+                    int i;
+                    for (i = 0; i < numArrays; i++)
+                    {
+                        const uint32 jmp = SWAP32(fxlc.tokens[1]);
+                        const uint32 bigjmp = (jmp >> 4) * 4;
+                        const uint32 ltljmp = (jmp >> 2) & 3;
+                        printf("Array #%d: %d\n", i, bigjmp + ltljmp);
+                        fxlc.tokens += 2;
+                        fxlc.tokcount -= 2;
+                    } // for
                     */
-                    // printf("%d %d %d\n", item, SWAP32(fxlc.tokens[1]), SWAP32(fxlc.tokens[0]));
-                    assert(0 && "Unknown operand code!");
                     break;
-                }
+                } // default
             } // switch
 
             operand->index = item;
