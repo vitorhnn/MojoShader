@@ -2566,6 +2566,8 @@ struct MOJOSHADER_glEffect
     unsigned int num_shaders;
     MOJOSHADER_glShader *shaders;
     unsigned int *shader_indices;
+    MOJOSHADER_glShader *current_vert;
+    MOJOSHADER_glShader *current_frag;
     MOJOSHADER_effectShader *current_vert_raw;
     MOJOSHADER_effectShader *current_frag_raw;
     MOJOSHADER_glProgram *prev_program;
@@ -2685,13 +2687,11 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     MOJOSHADER_effectState *state;
     MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
     MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
-    MOJOSHADER_glShader *vertShader = NULL;
-    MOJOSHADER_glShader *fragShader = NULL;
 
     if (ctx->bound_program != NULL)
     {
-        vertShader = ctx->bound_program->vertex;
-        fragShader = ctx->bound_program->fragment;
+        glEffect->current_vert = ctx->bound_program->vertex;
+        glEffect->current_frag = ctx->bound_program->fragment;
     } // if
 
     assert(glEffect->effect->current_pass == -1);
@@ -2709,15 +2709,13 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                     if (*state->value.valuesI == glEffect->shader_indices[j]) \
                     { \
                         raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
-                        if (raw->is_preshader) \
-                            assert(0 && "TODO: Standalone preshader support!"); \
-                        else \
-                            gls = &glEffect->shaders[j]; \
+                        if (!raw->is_preshader) \
+                            glEffect->gls = &glEffect->shaders[j]; \
                         break; \
                     } \
                 }
-        if ASSIGN_SHADER(MOJOSHADER_RS_VERTEXSHADER, rawVert, vertShader)
-        else if ASSIGN_SHADER(MOJOSHADER_RS_PIXELSHADER, rawFrag, fragShader)
+        if ASSIGN_SHADER(MOJOSHADER_RS_VERTEXSHADER, rawVert, current_vert)
+        else if ASSIGN_SHADER(MOJOSHADER_RS_PIXELSHADER, rawFrag, current_frag)
         #undef ASSIGN_SHADER
     } // for
 
@@ -2729,7 +2727,16 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 
     glEffect->current_vert_raw = rawVert;
     glEffect->current_frag_raw = rawFrag;
-    MOJOSHADER_glBindShaders(vertShader, fragShader);
+
+    /* If this effect pass has an array of shaders, we get to wait until
+     * CommitChanges to actually bind the final shaders.
+     * -flibit
+     */
+    // !!! FIXME: I bet this could be stored at parse/compile time. -flibit
+    if (!rawVert->is_preshader && !rawVert->is_preshader)
+        MOJOSHADER_glBindShaders(glEffect->current_vert,
+                                 glEffect->current_frag);
+
     MOJOSHADER_glEffectCommitChanges(glEffect);
 } // MOJOSHADER_glEffectBeginPass
 
@@ -2744,6 +2751,26 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     uint32 len;
     const MOJOSHADER_preshader *preshader;
     MOJOSHADER_glProgram *program = ctx->bound_program;
+    int selector_ran = 0;
+
+    /* For effect passes with arrays of shaders, we have to run a preshader
+     * that determines which shader to use, based on a parameter's value.
+     * -flibit
+     */
+    // !!! FIXME: We're just running the preshaders every time. Blech. -flibit
+    if (glEffect->current_vert_raw->is_preshader)
+    {
+        assert(0 && "TODO: Standalone preshader support!");
+        selector_ran = 1;
+    } // if
+    if (glEffect->current_frag_raw->is_preshader)
+    {
+        assert(0 && "TODO: Standalone preshader support!");
+        selector_ran = 1;
+    } // if
+    if (selector_ran)
+        MOJOSHADER_glBindShaders(glEffect->current_vert,
+                                 glEffect->current_frag);
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
