@@ -2679,6 +2679,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     MOJOSHADER_effectState *state;
     MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
     MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
+    int has_preshader = 0;
 
     if (ctx->bound_program != NULL)
     {
@@ -2707,6 +2708,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                     else if (*state->value.valuesI == glEffect->preshader_indices[j]) \
                     { \
                         raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
+                        has_preshader = 1; \
                         break; \
                     } \
                 }
@@ -2718,8 +2720,11 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     glEffect->effect->state_changes->render_state_changes = curPass->states;
     glEffect->effect->state_changes->render_state_change_count = curPass->state_count;
 
-    glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
-    glEffect->effect->state_changes->sampler_state_change_count = rawFrag->sampler_count;
+    if (rawFrag != NULL)
+    {
+        glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
+        glEffect->effect->state_changes->sampler_state_change_count = rawFrag->sampler_count;
+    } // if
 
     glEffect->current_vert_raw = rawVert;
     glEffect->current_frag_raw = rawFrag;
@@ -2728,8 +2733,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
      * CommitChanges to actually bind the final shaders.
      * -flibit
      */
-    // !!! FIXME: I bet this could be stored at parse/compile time. -flibit
-    if (!rawVert->is_preshader && !rawVert->is_preshader)
+    if (!has_preshader)
         MOJOSHADER_glBindShaders(glEffect->current_vert,
                                  glEffect->current_frag);
 
