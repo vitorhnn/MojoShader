@@ -10,7 +10,7 @@
 #define __MOJOSHADER_INTERNAL__ 1
 #include "mojoshader_internal.h"
 
-#if SUPPORT_PRESHADERS
+#ifdef MOJOSHADER_EFFECT_SUPPORT
 
 #include <math.h>
 
@@ -185,7 +185,6 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
         } // else
     } // for
 } // MOJOSHADER_runPreshader
-#endif
 
 static MOJOSHADER_effect MOJOSHADER_out_of_mem_effect = {
     1, &MOJOSHADER_out_of_mem_error, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -1042,6 +1041,8 @@ const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextTechnique(const MOJOS
     } // for
     assert(0 && "Technique is not part of this effect!");
 } // MOJOSHADER_effectFindNextValidTechnique
+
+#endif // MOJOSHADER_EFFECT_SUPPORT
 
 // end of mojoshader_effects.c ...
 

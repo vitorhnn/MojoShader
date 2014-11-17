@@ -2521,6 +2521,9 @@ void MOJOSHADER_glDestroyContext(MOJOSHADER_glContext *_ctx)
 } // MOJOSHADER_glDestroyContext
 
 
+#ifdef MOJOSHADER_EFFECT_SUPPORT
+
+
 struct MOJOSHADER_glEffect
 {
     MOJOSHADER_effect *effect;
@@ -2851,6 +2854,9 @@ void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect)
 
     glEffect->effect->state_changes = NULL;
 } // MOJOSHADER_glEffectEnd
+
+
+#endif // MOJOSHADER_EFFECT_SUPPORT
 
 // end of mojoshader_opengl.c ...
 

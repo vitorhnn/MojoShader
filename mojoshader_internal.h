@@ -76,16 +76,8 @@
 
 // Other stuff you can disable...
 
-// This removes the preshader parsing and execution code. You can save some
-//  bytes if you have normal shaders and not Effect files.
-#ifndef SUPPORT_PRESHADERS
-#define SUPPORT_PRESHADERS 1
-#endif
-
-#if SUPPORT_PRESHADERS
+#ifdef MOJOSHADER_EFFECT_SUPPORT
 void MOJOSHADER_runPreshader(const MOJOSHADER_preshader*, float*);
-#else
-#define MOJOSHADER_runPreshader(a, b)
 #endif
 
 

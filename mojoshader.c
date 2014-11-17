@@ -8186,8 +8186,8 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
     if ((tokcount < 2) || (SWAP32(tokens[1]) != PRES_ID))
         return;  // not a preshader.
 
-#if !SUPPORT_PRESHADERS
-    fail(ctx, "Preshader found, but preshader support is disabled!");
+#ifndef MOJOSHADER_EFFECT_SUPPORT
+    fail(ctx, "Preshader found, but effect support is disabled!");
 #else
 
     assert(ctx->have_preshader == 0);  // !!! FIXME: can you have more than one?
