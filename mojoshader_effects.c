@@ -71,6 +71,7 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
                 } // case
 
                 case MOJOSHADER_PRESHADEROPERAND_INPUT:
+                    // TODO: Handle array_register list! -flibit
                     if (isscalar)
                         src[opiter][0] = inregs[index];
                     else
