@@ -2776,7 +2776,10 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             for (i = 0; i < glEffect->num_shaders; i++) \
             { \
                 if (shader_object == glEffect->shader_indices[i]) \
+                { \
                     gls = &glEffect->shaders[i]; \
+                    break; \
+                } \
             } \
             selector_ran = 1; \
         }
