@@ -2711,6 +2711,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     uint32 start;
     uint32 len;
     const MOJOSHADER_preshader *preshader;
+    float selector;
     int selector_ran = 0;
 
     /* For effect passes with arrays of shaders, we have to run a preshader
@@ -2718,16 +2719,32 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
      * -flibit
      */
     // !!! FIXME: We're just running the preshaders every time. Blech. -flibit
-    if (glEffect->current_vert_raw->is_preshader)
-    {
-        assert(0 && "TODO: Standalone preshader support!");
-        selector_ran = 1;
-    } // if
-    if (glEffect->current_frag_raw->is_preshader)
-    {
-        assert(0 && "TODO: Standalone preshader support!");
-        selector_ran = 1;
-    } // if
+    #define SELECT_SHADER_FROM_PRESHADER(raw, gls) \
+        if (raw != NULL && raw->is_preshader) \
+        { \
+            preshader = raw->preshader; \
+            for (i = 0; i < preshader->symbol_count; i++) \
+            { \
+                sym = &preshader->symbols[i]; \
+                param = &glEffect->effect->params[raw->preshader_params[i]]; \
+                data = param->value.values; \
+                start = sym->register_index; \
+                len = sym->register_count * param->value.value_count; \
+                memcpy(preshader->registers + (start * 4), data, len * 4); \
+            } \
+            MOJOSHADER_runPreshader(preshader, &selector); \
+            for (i = 0; i < glEffect->num_shaders; i++) \
+            { \
+                if (((int) selector) == glEffect->shader_indices[i]) \
+                    gls = &glEffect->shaders[i]; \
+            } \
+            selector_ran = 1; \
+        }
+    SELECT_SHADER_FROM_PRESHADER(glEffect->current_vert_raw,
+                                 glEffect->current_vert)
+    SELECT_SHADER_FROM_PRESHADER(glEffect->current_frag_raw,
+                                 glEffect->current_frag)
+    #undef SELECT_SHADER_FROM_PRESHADER
     if (selector_ran)
         MOJOSHADER_glBindShaders(glEffect->current_vert,
                                  glEffect->current_frag);
