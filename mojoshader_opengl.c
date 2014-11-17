@@ -2527,6 +2527,8 @@ struct MOJOSHADER_glEffect
     unsigned int num_shaders;
     MOJOSHADER_glShader *shaders;
     unsigned int *shader_indices;
+    unsigned int num_preshaders;
+    unsigned int *preshader_indices;
     MOJOSHADER_glShader *current_vert;
     MOJOSHADER_glShader *current_frag;
     MOJOSHADER_effectShader *current_vert_raw;
@@ -2542,6 +2544,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
     MOJOSHADER_free f = effect->free;
     void *d = effect->malloc_data;
     int current_shader = 0;
+    int current_preshader = 0;
     GLuint shader = 0;
 
     MOJOSHADER_glEffect *retval = (MOJOSHADER_glEffect *) m(sizeof (MOJOSHADER_glEffect), d);
@@ -2558,9 +2561,15 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
         MOJOSHADER_effectObject *object = &effect->objects[i];
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
-            retval->num_shaders++;
+        {
+            if (object->shader.is_preshader)
+                retval->num_preshaders++;
+            else
+                retval->num_shaders++;
+        } // if
     } // for
 
+    // Alloc shader information
     retval->shaders = m(retval->num_shaders * sizeof (MOJOSHADER_glShader), d);
     if (retval->shaders == NULL)
     {
@@ -2579,6 +2588,18 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
     } // if
     memset(retval->shader_indices, '\0', retval->num_shaders * sizeof (unsigned int));
 
+    // Alloc preshader information
+    retval->preshader_indices = m(retval->num_preshaders * sizeof (unsigned int), d);
+    if (retval->preshader_indices == NULL)
+    {
+        f(retval->shaders, d);
+        f(retval->shader_indices, d);
+        f(retval, d);
+        out_of_memory();
+        return NULL;
+    } // if
+    memset(retval->preshader_indices, '\0', retval->num_preshaders * sizeof (unsigned int));
+
     // Run through the shaders again, compiling and tracking the object indices
     for (i = 0; i < effect->object_count; i++)
     {
@@ -2586,6 +2607,12 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
         if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
+            if (object->shader.is_preshader)
+            {
+                retval->shader_indices[current_preshader] = i;
+                current_preshader++;
+                continue;
+            }
             if (!ctx->profileCompileShader(object->shader.shader, &shader))
                 goto compile_shader_fail;
             retval->shaders[current_shader].parseData = object->shader.shader;
@@ -2620,6 +2647,7 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect)
         ctx->profileDeleteShader(glEffect->shaders[i].handle);
 
     f(glEffect->shader_indices, d);
+    f(glEffect->preshader_indices, d);
     // !!! FIXME: This gets deleted later, but only if the shader was bound.
     // f(glEffect->shaders, d);
     f(glEffect, d);
@@ -2670,8 +2698,12 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                     if (*state->value.valuesI == glEffect->shader_indices[j]) \
                     { \
                         raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
-                        if (!raw->is_preshader) \
-                            glEffect->gls = &glEffect->shaders[j]; \
+                        glEffect->gls = &glEffect->shaders[j]; \
+                        break; \
+                    } \
+                    else if (*state->value.valuesI == glEffect->preshader_indices[j]) \
+                    { \
+                        raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
                         break; \
                     } \
                 }
