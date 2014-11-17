@@ -9838,6 +9838,13 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                         preshader->temp_count = item + inst->element_count;
                     break;
                 } // case
+
+                default:
+                {
+                    // printf("%d %d %d\n", item, SWAP32(fxlc.tokens[1]), SWAP32(fxlc.tokens[0]));
+                    assert(0 && "Unknown operand code!");
+                    break;
+                }
             } // switch
 
             operand->index = item;
