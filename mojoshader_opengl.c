@@ -2612,10 +2612,9 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
         {
             if (object->shader.is_preshader)
             {
-                retval->shader_indices[current_preshader] = i;
-                current_preshader++;
+                retval->shader_indices[current_preshader++] = i;
                 continue;
-            }
+            } // if
             if (!ctx->profileCompileShader(object->shader.shader, &shader))
                 goto compile_shader_fail;
             retval->shaders[current_shader].parseData = object->shader.shader;
