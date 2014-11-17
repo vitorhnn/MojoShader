@@ -2750,6 +2750,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     uint32 len;
     const MOJOSHADER_preshader *preshader;
     float selector;
+    int shader_object;
     int selector_ran = 0;
 
     /* For effect passes with arrays of shaders, we have to run a preshader
@@ -2771,9 +2772,10 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 memcpy(preshader->registers + (start * 4), data, len * 4); \
             } \
             MOJOSHADER_runPreshader(preshader, &selector); \
+            shader_object = glEffect->effect->params[raw->params[0]].value.valuesI[(int) selector]; \
             for (i = 0; i < glEffect->num_shaders; i++) \
             { \
-                if (((int) selector) == glEffect->shader_indices[i]) \
+                if (shader_object == glEffect->shader_indices[i]) \
                     gls = &glEffect->shaders[i]; \
             } \
             selector_ran = 1; \
