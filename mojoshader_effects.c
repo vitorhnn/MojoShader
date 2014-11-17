@@ -15,8 +15,10 @@
 #include <math.h>
 
 void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
-                             const float *inregs, float *outregs)
+                             float *outregs)
 {
+    const float *inregs = preshader->registers;
+
     // this is fairly straightforward, as there aren't any branching
     //  opcodes in the preshader instruction set (at the moment, at least).
     const int scalarstart = (int) MOJOSHADER_PRESHADEROP_SCALAR_OPS;

@@ -98,11 +98,6 @@ struct MOJOSHADER_glProgram
     size_t ps_uniforms_bool_count;
     GLint *ps_uniforms_bool;
 
-    size_t vs_preshader_reg_count;
-    GLfloat *vs_preshader_regs;
-    size_t ps_preshader_reg_count;
-    GLfloat *ps_preshader_regs;
-
     uint32 refcount;
 
     int uses_pointsize;
@@ -1560,8 +1555,6 @@ static void program_unref(MOJOSHADER_glProgram *program)
             ctx->profileDeleteProgram(program->handle);
             shader_unref(program->vertex);
             shader_unref(program->fragment);
-            Free(program->vs_preshader_regs);
-            Free(program->ps_preshader_regs);
             Free(program->vs_uniforms_float4);
             Free(program->vs_uniforms_int4);
             Free(program->vs_uniforms_bool);
@@ -1689,38 +1682,6 @@ static int lookup_uniforms(MOJOSHADER_glProgram *program,
     MAKE_ARRAY(bool, GLint, 1, bool_count);
 
     #undef MAKE_ARRAY
-
-    if (pd->preshader)
-    {
-        unsigned int largest = 0;
-        const MOJOSHADER_symbol *sym = pd->preshader->symbols;
-        for (i = 0; i < pd->preshader->symbol_count; i++, sym++)
-        {
-            const unsigned int val = sym->register_index + sym->register_count;
-            if (val > largest)
-                largest = val;
-        } // for
-
-        if (largest > 0)
-        {
-            const size_t len = largest * sizeof (GLfloat) * 4;
-            GLfloat *buf = (GLfloat *) Malloc(len);
-            if (buf == NULL)
-                return 0;
-            memset(buf, '\0', len);
-
-            if (shader_type == MOJOSHADER_TYPE_VERTEX)
-            {
-                program->vs_preshader_reg_count = largest;
-                program->vs_preshader_regs = buf;
-            } // if
-            else if (shader_type == MOJOSHADER_TYPE_PIXEL)
-            {
-                program->ps_preshader_reg_count = largest;
-                program->ps_preshader_regs = buf;
-            } // else if
-        } // if
-    } // if
 
     return 1;
 } // lookup_uniforms
@@ -2750,7 +2711,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     uint32 start;
     uint32 len;
     const MOJOSHADER_preshader *preshader;
-    MOJOSHADER_glProgram *program = ctx->bound_program;
     int selector_ran = 0;
 
     /* For effect passes with arrays of shaders, we have to run a preshader
@@ -2797,7 +2757,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     #undef COPY_PARAMETER_DATA
 
     // !!! FIXME: We're just running the preshader every time. Blech. -flibit
-    #define COPY_PRESHADER_PARAMETER_DATA(raw, psreg, reg_file_f) \
+    #define COPY_PRESHADER_PARAMETER_DATA(raw, reg_file_f) \
         if (raw != NULL) \
         { \
             preshader = raw->shader->preshader; \
@@ -2810,15 +2770,15 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     data = param->value.values; \
                     start = sym->register_index; \
                     len = sym->register_count * param->value.value_count; \
-                    memcpy(program->psreg + (start * 4), data, len * 4); \
+                    memcpy(preshader->registers + (start * 4), data, len * 4); \
                 } \
-                MOJOSHADER_runPreshader(preshader, program->psreg, ctx->reg_file_f); \
+                MOJOSHADER_runPreshader(preshader, ctx->reg_file_f); \
             } \
         }
     COPY_PRESHADER_PARAMETER_DATA(glEffect->current_vert_raw,
-                                  vs_preshader_regs, vs_reg_file_f);
+                                  vs_reg_file_f);
     COPY_PRESHADER_PARAMETER_DATA(glEffect->current_frag_raw,
-                                  ps_preshader_regs, ps_reg_file_f);
+                                  ps_reg_file_f);
     #undef COPY_PRESHADER_PARAMETER_DATA
 
     ctx->generation++;

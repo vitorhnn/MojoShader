@@ -83,7 +83,7 @@
 #endif
 
 #if SUPPORT_PRESHADERS
-void MOJOSHADER_runPreshader(const MOJOSHADER_preshader*, const float*, float*);
+void MOJOSHADER_runPreshader(const MOJOSHADER_preshader*, float*);
 #else
 #define MOJOSHADER_runPreshader(a, b)
 #endif

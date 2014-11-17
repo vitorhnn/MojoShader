@@ -449,6 +449,8 @@ typedef struct MOJOSHADER_preshader
     MOJOSHADER_symbol *symbols;
     unsigned int instruction_count;
     MOJOSHADER_preshaderInstruction *instructions;
+    unsigned int register_count;
+    float *registers;
 } MOJOSHADER_preshader;
 
 /*

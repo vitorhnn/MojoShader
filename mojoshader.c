@@ -8495,6 +8495,24 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
 
         inst++;
     } // while
+
+    unsigned int largest = 0;
+    const MOJOSHADER_symbol *sym = preshader->symbols;
+    int i;
+    for (i = 0; i < preshader->symbol_count; i++, sym++)
+    {
+        const unsigned int val = sym->register_index + sym->register_count;
+        if (val > largest)
+            largest = val;
+    } // for
+
+    if (largest > 0)
+    {
+        const size_t len = largest * sizeof (float) * 4;
+        preshader->registers = (float *) Malloc(ctx, len);
+        memset(preshader->registers, '\0', len);
+        preshader->register_count = largest;
+    } // if
 #endif
 } // parse_preshader
 
@@ -9868,6 +9886,23 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
         inst++;
     } // while
 
+    unsigned int largest = 0;
+    const MOJOSHADER_symbol *sym = preshader->symbols;
+    for (i = 0; i < preshader->symbol_count; i++, sym++)
+    {
+        const unsigned int val = sym->register_index + sym->register_count;
+        if (val > largest)
+            largest = val;
+    } // for
+
+    if (largest > 0)
+    {
+        const size_t len = largest * sizeof (float) * 4;
+        preshader->registers = (float *) m(len, d);
+        memset(preshader->registers, '\0', len);
+        preshader->register_count = largest;
+    } // if
+
     return preshader;
 
 parsePreshader_notAPreshader:
@@ -9889,6 +9924,7 @@ void MOJOSHADER_freePreshader(const MOJOSHADER_preshader *preshader,
             for (j = 0; j < preshader->instructions[i].operand_count; j++)
                 f((void *) preshader->instructions[i].operands[j].array_registers, d);
         f((void *) preshader->instructions, d);
+        f((void *) preshader->registers, d);
         free_symbols(f, d, preshader->symbols, preshader->symbol_count);
         f((void *) preshader, d);
     } // if
