@@ -706,7 +706,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect);
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *effect);
+void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect);
 
 /* Prepare the effect for rendering with the currently applied technique.
  *

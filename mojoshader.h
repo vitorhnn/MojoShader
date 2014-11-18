@@ -743,6 +743,18 @@ const MOJOSHADER_parseData *MOJOSHADER_parse(const char *profile,
                                              void *d);
 
 
+/*
+ * Call this to dispose of parsing results when you are done with them.
+ *  This will call the MOJOSHADER_free function you provided to
+ *  MOJOSHADER_parse multiple times, if you provided one.
+ *  Passing a NULL here is a safe no-op.
+ *
+ * This function is thread safe, so long as any allocator you passed into
+ *  MOJOSHADER_parse() is, too.
+ */
+void MOJOSHADER_freeParseData(const MOJOSHADER_parseData *data);
+
+
 /* !!! FIXME: document me. */
 const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                                                       const unsigned int len,
@@ -755,17 +767,6 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
 void MOJOSHADER_freePreshader(const MOJOSHADER_preshader *preshader,
                               MOJOSHADER_free f,
                               void *d);
-
-/*
- * Call this to dispose of parsing results when you are done with them.
- *  This will call the MOJOSHADER_free function you provided to
- *  MOJOSHADER_parse multiple times, if you provided one.
- *  Passing a NULL here is a safe no-op.
- *
- * This function is thread safe, so long as any allocator you passed into
- *  MOJOSHADER_parse() is, too.
- */
-void MOJOSHADER_freeParseData(const MOJOSHADER_parseData *data);
 
 
 /* Effects interface... */
