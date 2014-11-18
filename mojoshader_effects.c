@@ -73,8 +73,20 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
                 } // case
 
                 case MOJOSHADER_PRESHADEROPERAND_INPUT:
-                    // TODO: Handle array_register list! -flibit
-                    if (isscalar)
+                    if (operand->array_register_count > 0)
+                    {
+                        int i;
+                        const int *regsi = (const int *) inregs;
+                        #define REG_JMP(reg) \
+                            ((reg >> 4) * 4) + ((reg >> 2) & 3)
+                        int arrIndex = regsi[REG_JMP(index)];
+                        for (i = 0; i < operand->array_register_count; i++)
+                        {
+                            arrIndex = regsi[operand->array_registers[i] + REG_JMP(arrIndex)];
+                        }
+                        src[opiter][0] = arrIndex;
+                    } // if
+                    else if (isscalar)
                         src[opiter][0] = inregs[index];
                     else
                     {
