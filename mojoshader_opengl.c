@@ -2592,16 +2592,19 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
     memset(retval->shader_indices, '\0', retval->num_shaders * sizeof (unsigned int));
 
     // Alloc preshader information
-    retval->preshader_indices = m(retval->num_preshaders * sizeof (unsigned int), d);
-    if (retval->preshader_indices == NULL)
+    if (retval->num_preshaders > 0)
     {
-        f(retval->shaders, d);
-        f(retval->shader_indices, d);
-        f(retval, d);
-        out_of_memory();
-        return NULL;
+        retval->preshader_indices = m(retval->num_preshaders * sizeof (unsigned int), d);
+        if (retval->preshader_indices == NULL)
+        {
+            f(retval->shaders, d);
+            f(retval->shader_indices, d);
+            f(retval, d);
+            out_of_memory();
+            return NULL;
+        } // if
+        memset(retval->preshader_indices, '\0', retval->num_preshaders * sizeof (unsigned int));
     } // if
-    memset(retval->preshader_indices, '\0', retval->num_preshaders * sizeof (unsigned int));
 
     // Run through the shaders again, compiling and tracking the object indices
     for (i = 0; i < effect->object_count; i++)
@@ -2704,7 +2707,8 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
                         glEffect->gls = &glEffect->shaders[j]; \
                         break; \
                     } \
-                    else if (*state->value.valuesI == glEffect->preshader_indices[j]) \
+                    else if (glEffect->num_preshaders > 0 \
+                          && *state->value.valuesI == glEffect->preshader_indices[j]) \
                     { \
                         raw = &glEffect->effect->objects[*state->value.valuesI].shader; \
                         has_preshader = 1; \
@@ -2768,9 +2772,9 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             { \
                 sym = &preshader->symbols[i]; \
                 param = &glEffect->effect->params[raw->preshader_params[i]]; \
-                data = param->value.values; \
                 start = sym->register_index * 4; \
-                len = sym->register_count * 4; \
+                data = param->value.values; \
+                len = param->value.value_count * 4; \
                 memcpy(preshader->registers + start, data, len); \
             } \
             MOJOSHADER_runPreshader(preshader, &selector); \
@@ -2800,9 +2804,9 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             { \
                 sym = &raw->shader->symbols[i]; \
                 param = &glEffect->effect->params[raw->params[i]]; \
-                data = param->value.values; \
                 start = sym->register_index; \
-                len = sym->register_count; \
+                data = param->value.values; \
+                len = param->value.value_count; \
                 if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
                     for (j = 0; j < len; j++) \
                         ctx->regb[start + j] = ((uint32 *) data)[j]; \
@@ -2826,10 +2830,10 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 { \
                     sym = &preshader->symbols[i]; \
                     param = &glEffect->effect->params[raw->preshader_params[i]]; \
+                    start = sym->register_index * 4; \
                     data = param->value.values; \
-                    start = sym->register_index; \
-                    len = sym->register_count * param->value.value_count; \
-                    memcpy(preshader->registers + (start * 4), data, len * 4); \
+                    len = param->value.value_count * 4; \
+                    memcpy(preshader->registers + start, data, len); \
                 } \
                 MOJOSHADER_runPreshader(preshader, ctx->reg_file_f); \
             } \
