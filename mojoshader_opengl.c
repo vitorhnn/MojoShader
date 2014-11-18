@@ -2772,7 +2772,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             { \
                 sym = &preshader->symbols[i]; \
                 param = &glEffect->effect->params[raw->preshader_params[i]]; \
-                start = sym->register_index * 4; \
+                start = sym->register_index; \
                 data = param->value.values; \
                 len = param->value.value_count * 4; \
                 memcpy(preshader->registers + start, data, len); \
@@ -2811,9 +2811,9 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     for (j = 0; j < len; j++) \
                         ctx->regb[start + j] = ((uint32 *) data)[j]; \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                    memcpy(ctx->regi + (start * 4), data, len * 4); \
+                    memcpy(ctx->regi + start, data, len * 4); \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                    memcpy(ctx->regf + (start * 4), data, len * 4); \
+                    memcpy(ctx->regf + start, data, len * 4); \
             } // for
     COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
     COPY_PARAMETER_DATA(rawFrag, ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
