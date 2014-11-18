@@ -678,6 +678,14 @@ static void readlargeobjects(const uint32 numlargeobjects,
                 object->shader.preshader = MOJOSHADER_parsePreshader(*ptr + start, length - end,
                                                                      m, f, d);
                 // !!! FIXME: check for errors.
+                object->shader.preshader_param_count = object->shader.preshader->symbol_count;
+                object->shader.preshader_params = m(object->shader.preshader_param_count * sizeof (uint32), d);
+                for (j = 0; j < object->shader.preshader->symbol_count; j++)
+                {
+                    object->shader.preshader_params[j] = findparameter(effect->params,
+                                                                       effect->param_count,
+                                                                       object->shader.preshader->symbols[j].name);
+                } // for
             } // if
             else
             {

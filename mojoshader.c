@@ -9578,6 +9578,7 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
     fillerContext.malloc = m;
     fillerContext.free = f;
     fillerContext.malloc_data = d;
+    fillerContext.out_of_memory = 0;
 
     MOJOSHADER_preshader *preshader = NULL;
 

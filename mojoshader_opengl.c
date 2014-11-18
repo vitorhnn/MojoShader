@@ -2612,7 +2612,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
         {
             if (object->shader.is_preshader)
             {
-                retval->shader_indices[current_preshader++] = i;
+                retval->preshader_indices[current_preshader++] = i;
                 continue;
             } // if
             if (!ctx->profileCompileShader(object->shader.shader, &shader))
@@ -2752,6 +2752,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     float selector;
     int shader_object;
     int selector_ran = 0;
+    MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
+    MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
 
     /* For effect passes with arrays of shaders, we have to run a preshader
      * that determines which shader to use, based on a parameter's value.
@@ -2767,12 +2769,13 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 sym = &preshader->symbols[i]; \
                 param = &glEffect->effect->params[raw->preshader_params[i]]; \
                 data = param->value.values; \
-                start = sym->register_index; \
-                len = sym->register_count * param->value.value_count; \
-                memcpy(preshader->registers + (start * 4), data, len * 4); \
+                start = sym->register_index * 4; \
+                len = sym->register_count * 4; \
+                memcpy(preshader->registers + start, data, len); \
             } \
             MOJOSHADER_runPreshader(preshader, &selector); \
             shader_object = glEffect->effect->params[raw->params[0]].value.valuesI[(int) selector]; \
+            raw = &glEffect->effect->objects[shader_object].shader; \
             for (i = 0; i < glEffect->num_shaders; i++) \
             { \
                 if (shader_object == glEffect->shader_indices[i]) \
@@ -2783,10 +2786,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             } \
             selector_ran = 1; \
         }
-    SELECT_SHADER_FROM_PRESHADER(glEffect->current_vert_raw,
-                                 glEffect->current_vert)
-    SELECT_SHADER_FROM_PRESHADER(glEffect->current_frag_raw,
-                                 glEffect->current_frag)
+    SELECT_SHADER_FROM_PRESHADER(rawVert, glEffect->current_vert)
+    SELECT_SHADER_FROM_PRESHADER(rawFrag, glEffect->current_frag)
     #undef SELECT_SHADER_FROM_PRESHADER
     if (selector_ran)
         MOJOSHADER_glBindShaders(glEffect->current_vert,
@@ -2801,7 +2802,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 param = &glEffect->effect->params[raw->params[i]]; \
                 data = param->value.values; \
                 start = sym->register_index; \
-                len = sym->register_count * param->value.value_count; \
+                len = sym->register_count; \
                 if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL) \
                     for (j = 0; j < len; j++) \
                         ctx->regb[start + j] = ((uint32 *) data)[j]; \
@@ -2810,10 +2811,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
                     memcpy(ctx->regf + (start * 4), data, len * 4); \
             } // for
-    COPY_PARAMETER_DATA(glEffect->current_vert_raw,
-                        vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
-    COPY_PARAMETER_DATA(glEffect->current_frag_raw,
-                        ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
+    COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
+    COPY_PARAMETER_DATA(rawFrag, ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
     #undef COPY_PARAMETER_DATA
 
     // !!! FIXME: We're just running the preshader every time. Blech. -flibit
@@ -2835,10 +2834,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 MOJOSHADER_runPreshader(preshader, ctx->reg_file_f); \
             } \
         }
-    COPY_PRESHADER_PARAMETER_DATA(glEffect->current_vert_raw,
-                                  vs_reg_file_f);
-    COPY_PRESHADER_PARAMETER_DATA(glEffect->current_frag_raw,
-                                  ps_reg_file_f);
+    COPY_PRESHADER_PARAMETER_DATA(rawVert, vs_reg_file_f);
+    COPY_PRESHADER_PARAMETER_DATA(rawFrag, ps_reg_file_f);
     #undef COPY_PRESHADER_PARAMETER_DATA
 
     ctx->generation++;
