@@ -77,12 +77,10 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
                     {
                         int i;
                         const int *regsi = (const int *) inregs;
-                        #define REG_JMP(reg) \
-                            ((reg >> 4) * 4) + ((reg >> 2) & 3)
-                        int arrIndex = regsi[REG_JMP(index)];
+                        int arrIndex = regsi[((index >> 4) * 4) + ((index >> 2) & 3)];
                         for (i = 0; i < operand->array_register_count; i++)
                         {
-                            arrIndex = regsi[operand->array_registers[i] + REG_JMP(arrIndex)];
+                            arrIndex = regsi[operand->array_registers[i] + arrIndex];
                         }
                         src[opiter][0] = arrIndex;
                     } // if
@@ -191,7 +189,8 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
         } // if
         else
         {
-            assert(operand->type == MOJOSHADER_PRESHADEROPERAND_OUTPUT);
+            assert(operand->type == MOJOSHADER_PRESHADEROPERAND_INPUT
+                || operand->type == MOJOSHADER_PRESHADEROPERAND_OUTPUT);
             for (i = 0; i < elems; i++)
                 outregs[operand->index + i] = (float) dst[i];
         } // else
