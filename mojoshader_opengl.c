@@ -109,6 +109,9 @@ struct MOJOSHADER_glProgram
     GLint ps_float4_loc;
     GLint ps_int4_loc;
     GLint ps_bool_loc;
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+    GLint vs_flip_loc;
+#endif
 };
 
 #ifndef WINGDIAPI
@@ -559,6 +562,9 @@ static void impl_GLSL_FinalInitProgram(MOJOSHADER_glProgram *program)
     program->ps_float4_loc = glsl_uniform_loc(program, "ps_uniforms_vec4");
     program->ps_int4_loc = glsl_uniform_loc(program, "ps_uniforms_ivec4");
     program->ps_bool_loc = glsl_uniform_loc(program, "ps_uniforms_bool");
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+    program->vs_flip_loc = glsl_uniform_loc(program, "vpFlip");
+#endif
 } // impl_GLSL_FinalInitProgram
 
 
@@ -2519,6 +2525,19 @@ void MOJOSHADER_glDestroyContext(MOJOSHADER_glContext *_ctx)
     Free(ctx);
     ctx = ((current_ctx == _ctx) ? NULL : current_ctx);
 } // MOJOSHADER_glDestroyContext
+
+
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+
+
+void MOJOSHADER_glProgramViewportFlip(int flip)
+{
+    if (ctx->bound_program->vs_flip_loc != -1)
+        ctx->glUniform1i(ctx->bound_program->vs_flip_loc, flip);
+}
+
+
+#endif
 
 
 #ifdef MOJOSHADER_EFFECT_SUPPORT

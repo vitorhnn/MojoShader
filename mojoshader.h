@@ -3065,6 +3065,15 @@ void MOJOSHADER_glSetVertexAttribDivisor(MOJOSHADER_usage usage,
  */
 void MOJOSHADER_glProgramReady(void);
 
+/* FIXME: Make this a configurable define.
+ * Basically, you shouldn't use this unless you're screwed like FNA is and
+ * have to hack in a way to flip the y axis without actually changing anything.
+ * -flibit
+ */
+#define MOJOSHADER_FLIP_RENDERTARGET
+// !!! FIXME: Document me.
+void MOJOSHADER_glProgramViewportFlip(int flip);
+
 /*
  * Free the resources of a linked program. This will delete the GL object
  *  and free memory.

@@ -2225,6 +2225,10 @@ static void emit_GLSL_end(Context *ctx)
         set_used_register(ctx, REG_TYPE_COLOROUT, 0, 1);
         output_line(ctx, "%s_oC0 = %s_r0;", shstr, shstr);
     } // if
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+    else if (shader_is_vertex(ctx))
+        output_line(ctx, "vs_oPos.y = vs_oPos.y * vpFlip;");
+#endif
 
     // force a RET opcode if we're at the end of the stream without one.
     if (ctx->previous_opcode != OPCODE_RET)
@@ -2265,6 +2269,10 @@ static void emit_GLSL_finalize(Context *ctx)
     output_GLSL_uniform_array(ctx, REG_TYPE_CONST, ctx->uniform_float4_count);
     output_GLSL_uniform_array(ctx, REG_TYPE_CONSTINT, ctx->uniform_int4_count);
     output_GLSL_uniform_array(ctx, REG_TYPE_CONSTBOOL, ctx->uniform_bool_count);
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+    if (shader_is_vertex(ctx))
+        output_line(ctx, "uniform int vpFlip;");
+#endif
     pop_output(ctx);
 } // emit_GLSL_finalize
 
