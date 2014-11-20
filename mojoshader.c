@@ -2227,7 +2227,7 @@ static void emit_GLSL_end(Context *ctx)
     } // if
 #ifdef MOJOSHADER_FLIP_RENDERTARGET
     else if (shader_is_vertex(ctx))
-        output_line(ctx, "vs_oPos.y = vs_oPos.y * vpFlip;");
+        output_line(ctx, "gl_Position.y = gl_Position.y * vpFlip;");
 #endif
 
     // force a RET opcode if we're at the end of the stream without one.
