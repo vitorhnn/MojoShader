@@ -2836,7 +2836,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     if (param->value.element_count > 0) \
                         for (j = 0; j < param->value.element_count; j++) \
                             memcpy(ctx->regi + start + (j * 4), \
-                                   data + (j * 4 * param->value.row_count), \
+                                   data + (j * 4 * param->value.row_count * param->value.column_count), \
                                    len / param->value.element_count); \
                     else \
                         memcpy(ctx->regi + start, data, len); \
@@ -2848,7 +2848,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     if (param->value.element_count > 0) \
                         for (j = 0; j < param->value.element_count; j++) \
                             memcpy(ctx->regf + start + (j * 4), \
-                                   data + (j * 4 * param->value.row_count), \
+                                   data + (j * 4 * param->value.row_count * param->value.column_count), \
                                    len / param->value.element_count); \
                     else \
                         memcpy(ctx->regf + start, data, len); \
