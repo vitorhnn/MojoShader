@@ -2830,9 +2830,29 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     for (j = 0; j < len; j++) \
                         ctx->regb[start + j] = ((uint32 *) data)[j]; \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                    memcpy(ctx->regi + start, data, len * 4); \
+                { \
+                    start *= 4; \
+                    len *= 4; \
+                    if (param->value.element_count > 0) \
+                        for (j = 0; j < param->value.element_count; j++) \
+                            memcpy(ctx->regi + start + (j * 4), \
+                                   data + (j * 4 * param->value.row_count), \
+                                   len / param->value.element_count); \
+                    else \
+                        memcpy(ctx->regi + start, data, len); \
+                } \
                 else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                    memcpy(ctx->regf + start, data, len * 4); \
+                { \
+                    start *= 4; \
+                    len *= 4; \
+                    if (param->value.element_count > 0) \
+                        for (j = 0; j < param->value.element_count; j++) \
+                            memcpy(ctx->regf + start + (j * 4), \
+                                   data + (j * 4 * param->value.row_count), \
+                                   len / param->value.element_count); \
+                    else \
+                        memcpy(ctx->regf + start, data, len); \
+                } \
             } // for
     COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
     COPY_PARAMETER_DATA(rawFrag, ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
