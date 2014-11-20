@@ -189,8 +189,8 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
         } // if
         else
         {
-            assert(operand->type == MOJOSHADER_PRESHADEROPERAND_INPUT
-                || operand->type == MOJOSHADER_PRESHADEROPERAND_OUTPUT);
+            //assert(operand->type == MOJOSHADER_PRESHADEROPERAND_INPUT
+            //    || operand->type == MOJOSHADER_PRESHADEROPERAND_OUTPUT);
             for (i = 0; i < elems; i++)
                 outregs[operand->index + i] = (float) dst[i];
         } // else
