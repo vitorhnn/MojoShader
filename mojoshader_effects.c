@@ -560,7 +560,7 @@ static void readsmallobjects(const uint32 numsmallobjects,
               || object->type == MOJOSHADER_SYMTYPE_TEXTURE3D
               || object->type == MOJOSHADER_SYMTYPE_TEXTURECUBE)
         {
-            object->texture.tex_register = *((uint32 *) *ptr);
+            // No-op. Why is this even here?
         } // else if
         else if (object->type == MOJOSHADER_SYMTYPE_SAMPLER
               || object->type == MOJOSHADER_SYMTYPE_SAMPLER1D

@@ -433,7 +433,7 @@ typedef struct MOJOSHADER_effectString
 typedef struct MOJOSHADER_effectTexture
 {
     MOJOSHADER_symbolType type;
-    unsigned int tex_register;
+    /* FIXME: Does this even do anything? */
 } MOJOSHADER_effectTexture;
 
 typedef union MOJOSHADER_effectObject
