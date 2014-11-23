@@ -599,6 +599,7 @@ static void readsmallobjects(const uint32 numsmallobjects,
                 object->shader.params[j] = par;
                 if (object->shader.shader->symbols[j].register_set == MOJOSHADER_SYMREGSET_SAMPLER)
                 {
+                    object->shader.samplers[curSampler].sampler_name = object->shader.shader->symbols[j].name;
                     object->shader.samplers[curSampler].sampler_register = object->shader.shader->symbols[j].register_index;
                     object->shader.samplers[curSampler].sampler_state_count = effect->params[par].value.value_count;
                     object->shader.samplers[curSampler].sampler_states = effect->params[par].value.valuesSS;
@@ -719,6 +720,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                     object->shader.params[j] = par;
                     if (object->shader.shader->symbols[j].register_set == MOJOSHADER_SYMREGSET_SAMPLER)
                     {
+                        object->shader.samplers[curSampler].sampler_name = object->shader.shader->symbols[j].name;
                         object->shader.samplers[curSampler].sampler_register = object->shader.shader->symbols[j].register_index;
                         object->shader.samplers[curSampler].sampler_state_count = effect->params[par].value.value_count;
                         object->shader.samplers[curSampler].sampler_states = effect->params[par].value.valuesSS;
