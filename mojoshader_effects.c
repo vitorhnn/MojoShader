@@ -60,7 +60,7 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
                 case MOJOSHADER_PRESHADEROPERAND_LITERAL:
                 {
                     const double *lit = &preshader->literals[index];
-                    assert((index + elems) <= preshader->literal_count);
+                    //assert((index + elems) <= preshader->literal_count);
                     if (!isscalar)
                         memcpy(&src[opiter][0], lit, elemsbytes);
                     else
