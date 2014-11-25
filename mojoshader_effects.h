@@ -592,6 +592,10 @@ MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 void MOJOSHADER_freeEffect(const MOJOSHADER_effect *effect);
 
 
+/* !!! FIXME: document me. */
+MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect);
+
+
 /* Effect parameter interface... */
 
 /* Set the constant value for the specified effect parameter.
