@@ -1169,7 +1169,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
             memset(clone->techniques[i].passes[j].states, '\0', siz);
             for (k = 0; k < clone->techniques[i].passes[j].state_count; k++)
             {
-                clone->techniques[i].passes[j].states[k].type = effect->techniques[i].passes[j].states[j].type;
+                clone->techniques[i].passes[j].states[k].type = effect->techniques[i].passes[j].states[k].type;
                 copyvalue(&clone->techniques[i].passes[j].states[k].value,
                           &effect->techniques[i].passes[j].states[k].value,
                           m, d);
