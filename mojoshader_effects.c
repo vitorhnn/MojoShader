@@ -1069,6 +1069,34 @@ void copyvalue(MOJOSHADER_effectValue *dst,
 } // copyvalue
 
 
+const MOJOSHADER_preshader *copypreshader(const MOJOSHADER_preshader *src,
+                                          MOJOSHADER_malloc m,
+                                          void *d)
+{
+    MOJOSHADER_preshader *retval;
+    retval = (MOJOSHADER_preshader *) m(sizeof (MOJOSHADER_preshader), d);
+    memset(retval, '\0', sizeof (MOJOSHADER_preshader));
+
+    // TODO: The whole thing -flibit
+
+    return retval;
+} // copypreshader
+
+
+const MOJOSHADER_parseData *copyparsedata(const MOJOSHADER_parseData *src,
+                                          MOJOSHADER_malloc m,
+                                          void *d)
+{
+    MOJOSHADER_parseData *retval;
+    retval = (MOJOSHADER_parseData *) m(sizeof (MOJOSHADER_parseData), d);
+    memset(retval, '\0', sizeof (MOJOSHADER_parseData));
+
+    // TODO: The whole thing -flibit
+
+    return retval;
+} // copyparsedata
+
+
 MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
 {
     int i, j, k;
@@ -1077,6 +1105,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
     void *d = effect->malloc_data;
     uint32 siz = 0;
     char *stringcopy = NULL;
+    uint32 curSampler;
 
     if ((effect == NULL) || (effect == &MOJOSHADER_out_of_mem_effect))
         return NULL;  // no-op.
@@ -1095,7 +1124,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
         siz = strlen(effect->location) + 1; \
         stringcopy = (char *) m(siz, d); \
         if (stringcopy == NULL) \
-            goto MOJOSHADER_outOfMemory; \
+            goto cloneEffect_outOfMemory; \
         strcpy(stringcopy, effect->location); \
         clone->location = stringcopy; \
 
@@ -1104,7 +1133,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
     clone->error_count = effect->error_count;
     clone->errors = (MOJOSHADER_error *) m(siz, d);
     if (clone->errors == NULL)
-        goto MOJOSHADER_outOfMemory;
+        goto cloneEffect_outOfMemory;
     memset(clone->errors, '\0', siz);
     for (i = 0; i < clone->error_count; i++)
     {
@@ -1120,6 +1149,8 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
     siz = sizeof (MOJOSHADER_effectParam) * effect->param_count;
     clone->param_count = effect->param_count;
     clone->params = (MOJOSHADER_effectParam *) m(siz, d);
+    if (clone->params == NULL)
+        goto cloneEffect_outOfMemory;
     memset(clone->params, '\0', siz);
     for (i = 0; i < clone->param_count; i++)
     {
@@ -1130,7 +1161,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
         clone->params[i].annotation_count = effect->params[i].annotation_count;
         clone->params[i].annotations = (MOJOSHADER_effectAnnotation *) m(siz, d);
         if (clone->params[i].annotations == NULL)
-            goto MOJOSHADER_outOfMemory;
+            goto cloneEffect_outOfMemory;
         memset(clone->params[i].annotations, '\0', siz);
         for (j = 0; j < clone->params[i].annotation_count; j++)
             copyvalue(&clone->params[i].annotations[j],
@@ -1143,7 +1174,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
     clone->technique_count = effect->technique_count;
     clone->techniques = (MOJOSHADER_effectTechnique *) m(siz, d);
     if (clone->techniques == NULL)
-        goto MOJOSHADER_outOfMemory;
+        goto cloneEffect_outOfMemory;
     memset(clone->techniques, '\0', siz);
     for (i = 0; i < clone->technique_count; i++)
     {
@@ -1154,7 +1185,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
         clone->techniques[i].pass_count = effect->techniques[i].pass_count;
         clone->techniques[i].passes = (MOJOSHADER_effectPass *) m(siz, d);
         if (clone->techniques[i].passes == NULL)
-            goto MOJOSHADER_outOfMemory;
+            goto cloneEffect_outOfMemory;
         memset(clone->techniques[i].passes, '\0', siz);
         for (j = 0; j < clone->techniques[i].pass_count; j++)
         {
@@ -1165,7 +1196,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
             clone->techniques[i].passes[j].state_count = effect->techniques[i].passes[j].state_count;
             clone->techniques[i].passes[j].states = (MOJOSHADER_effectState *) m(siz, d);
             if (clone->techniques[i].passes[j].states == NULL)
-                goto MOJOSHADER_outOfMemory;
+                goto cloneEffect_outOfMemory;
             memset(clone->techniques[i].passes[j].states, '\0', siz);
             for (k = 0; k < clone->techniques[i].passes[j].state_count; k++)
             {
@@ -1180,7 +1211,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
             clone->techniques[i].passes[j].annotation_count = effect->techniques[i].passes[j].annotation_count;
             clone->techniques[i].passes[j].annotations = (MOJOSHADER_effectAnnotation *) m(siz, d);
             if (clone->techniques[i].passes[j].annotations == NULL)
-                goto MOJOSHADER_outOfMemory;
+                goto cloneEffect_outOfMemory;
             memset(clone->techniques[i].passes[j].annotations, '\0', siz);
             for (k = 0; k < clone->techniques[i].passes[j].annotation_count; k++)
                 copyvalue(&clone->techniques[i].passes[j].annotations[k],
@@ -1193,7 +1224,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
         clone->techniques[i].annotation_count = effect->techniques[i].annotation_count;
         clone->techniques[i].annotations = (MOJOSHADER_effectAnnotation *) m(siz, d);
         if (clone->techniques[i].annotations == NULL)
-            goto MOJOSHADER_outOfMemory;
+            goto cloneEffect_outOfMemory;
         memset(clone->techniques[i].annotations, '\0', siz);
         for (j = 0; j < clone->techniques[i].annotation_count; j++)
             copyvalue(&clone->techniques[i].annotations[j],
@@ -1217,7 +1248,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
     clone->object_count = effect->object_count;
     clone->objects = (MOJOSHADER_effectObject *) m(siz, d);
     if (clone->objects == NULL)
-        goto MOJOSHADER_outOfMemory;
+        goto cloneEffect_outOfMemory;
     memset(clone->objects, '\0', siz);
     for (i = 0; i < clone->object_count; i++)
     {
@@ -1225,10 +1256,47 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
         if (clone->objects[i].type == MOJOSHADER_SYMTYPE_PIXELSHADER
          || clone->objects[i].type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
-            // FIXME: Deep parseData/preshader copies! D:
-            memcpy(&clone->objects[i].shader,
-                   &effect->objects[i].shader,
-                   sizeof (MOJOSHADER_effectShader));
+            clone->objects[i].shader.technique = effect->objects[i].shader.technique;
+            clone->objects[i].shader.pass = effect->objects[i].shader.pass;
+            clone->objects[i].shader.is_preshader = effect->objects[i].shader.is_preshader;
+            siz = sizeof (uint32) * effect->objects[i].shader.preshader_param_count;
+            clone->objects[i].shader.preshader_param_count = effect->objects[i].shader.preshader_param_count;
+            clone->objects[i].shader.preshader_params = (uint32 *) m(siz, d);
+            memcpy(clone->objects[i].shader.preshader_params,
+                   effect->objects[i].shader.preshader_params,
+                   siz);
+            siz = sizeof (uint32) * effect->objects[i].shader.param_count;
+            clone->objects[i].shader.param_count = effect->objects[i].shader.param_count;
+            clone->objects[i].shader.params = (uint32 *) m(siz, d);
+            memcpy(clone->objects[i].shader.params,
+                   effect->objects[i].shader.params,
+                   siz);
+
+            if (clone->objects[i].shader.is_preshader)
+            {
+                clone->objects[i].shader.preshader = copypreshader(effect->objects[i].shader.preshader,
+                                                                   m, d);
+                continue;
+            } // if
+
+            clone->objects[i].shader.shader = copyparsedata(effect->objects[i].shader.shader,
+                                                            m, d);
+
+            siz = sizeof (MOJOSHADER_samplerStateRegister) * effect->objects[i].shader.sampler_count;
+            clone->objects[i].shader.sampler_count = effect->objects[i].shader.sampler_count;
+            clone->objects[i].shader.samplers = (MOJOSHADER_samplerStateRegister *) m(siz, d);
+            if (clone->objects[i].shader.samplers == NULL)
+                goto cloneEffect_outOfMemory;
+            curSampler = 0;
+            for (j = 0; j < clone->objects[i].shader.shader->symbol_count; j++)
+                if (clone->objects[i].shader.shader->symbols[j].register_set == MOJOSHADER_SYMREGSET_SAMPLER)
+                {
+                    clone->objects[i].shader.samplers[curSampler].sampler_name = clone->objects[i].shader.shader->symbols[j].name;
+                    clone->objects[i].shader.samplers[curSampler].sampler_register = clone->objects[i].shader.shader->symbols[j].register_index;
+                    clone->objects[i].shader.samplers[curSampler].sampler_state_count = clone->params[clone->objects[i].shader.params[j]].value.value_count;
+                    clone->objects[i].shader.samplers[curSampler].sampler_states = clone->params[clone->objects[i].shader.params[j]].value.valuesSS;
+                    curSampler++;
+                } // if
         } // if
         else if (clone->objects[i].type == MOJOSHADER_SYMTYPE_SAMPLER
               || clone->objects[i].type == MOJOSHADER_SYMTYPE_SAMPLER1D
@@ -1248,7 +1316,7 @@ MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect)
 
     return clone;
 
-MOJOSHADER_outOfMemory:
+cloneEffect_outOfMemory:
     MOJOSHADER_freeEffect(clone);
     return NULL;
 } // MOJOSHADER_cloneEffect
