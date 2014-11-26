@@ -1069,15 +1069,95 @@ void copyvalue(MOJOSHADER_effectValue *dst,
 } // copyvalue
 
 
+void copysymbolinfo(MOJOSHADER_symbolTypeInfo *dst,
+                    MOJOSHADER_symbolTypeInfo *src,
+                    MOJOSHADER_malloc m,
+                    void *d)
+{
+    int i;
+    uint32 siz;
+    char *stringcopy;
+
+    dst->parameter_class = src->parameter_class;
+    dst->parameter_type = src->parameter_type;
+    dst->rows = src->rows;
+    dst->columns = src->columns;
+    dst->elements = src->elements;
+    dst->member_count = src->member_count;
+
+    if (dst->member_count > 0)
+    {
+        siz = sizeof (MOJOSHADER_symbolStructMember) * dst->member_count;
+        dst->members = (MOJOSHADER_symbolStructMember *) m(siz, d);
+        // !!! FIXME: Out of memory check!
+        for (i = 0; i < dst->member_count; i++)
+        {
+            if (src->members[i].name != NULL)
+            {
+                siz = strlen(src->members[i].name) + 1;
+                stringcopy = (char *) m(siz, d);
+                strcpy(stringcopy, src->members[i].name);
+                dst->members[i].name = stringcopy;
+            } // if
+            copysymbolinfo(&dst->members[i].info, &src->members[i].info, m, d);
+        } // for
+    } // if
+} // copysymbolinfo
+
+
 const MOJOSHADER_preshader *copypreshader(const MOJOSHADER_preshader *src,
                                           MOJOSHADER_malloc m,
                                           void *d)
 {
+    int i;
+    uint32 siz;
+    char *stringcopy;
     MOJOSHADER_preshader *retval;
+
     retval = (MOJOSHADER_preshader *) m(sizeof (MOJOSHADER_preshader), d);
+    // !!! FIXME: Out of memory check!
     memset(retval, '\0', sizeof (MOJOSHADER_preshader));
 
-    // TODO: The whole thing -flibit
+    siz = sizeof (double) * src->literal_count;
+    retval->literal_count = src->literal_count;
+    retval->literals = (double *) m(siz, d);
+    // !!! FIXME: Out of memory check!
+    memcpy(retval->literals, src->literals, siz);
+
+    retval->temp_count = src->temp_count;
+
+    siz = sizeof (MOJOSHADER_symbol) * src->symbol_count;
+    retval->symbol_count = src->symbol_count;
+    retval->symbols = (MOJOSHADER_symbol *) m(siz, d);
+    // !!! FIXME: Out of memory check!
+    memset(retval->symbols, '\0', siz);
+
+    for (i = 0; i < retval->symbol_count; i++)
+    {
+        siz = strlen(src->symbols[i].name) + 1;
+        stringcopy = (char *) m(siz, d);
+        // !!! FIXME: Out of memory check!
+        strcpy(stringcopy, src->symbols[i].name);
+        retval->symbols[i].name = stringcopy;
+        retval->symbols[i].register_set = src->symbols[i].register_set;
+        retval->symbols[i].register_index = src->symbols[i].register_index;
+        retval->symbols[i].register_count = src->symbols[i].register_count;
+        copysymbolinfo(&retval->symbols[i].info,
+                       &src->symbols[i].info,
+                       m, d);
+    } // for
+
+    siz = sizeof (MOJOSHADER_preshaderInstruction) * src->instruction_count;
+    retval->instruction_count = src->instruction_count;
+    retval->instructions = (MOJOSHADER_preshaderInstruction *) m(siz, d);
+    // !!! FIXME: Out of memory check!
+    memcpy(retval->instructions, src->instructions, siz);
+
+    siz = sizeof (float) * src->register_count;
+    retval->register_count = src->register_count;
+    retval->registers = (float *) m(siz, d);
+    // !!! FIXME: Out of memory check!
+    memcpy(retval->registers, src->registers, siz);
 
     return retval;
 } // copypreshader
