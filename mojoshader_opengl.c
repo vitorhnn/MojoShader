@@ -2742,12 +2742,6 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     glEffect->effect->state_changes->render_state_changes = curPass->states;
     glEffect->effect->state_changes->render_state_change_count = curPass->state_count;
 
-    if (rawFrag != NULL)
-    {
-        glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
-        glEffect->effect->state_changes->sampler_state_change_count = rawFrag->sampler_count;
-    } // if
-
     glEffect->current_vert_raw = rawVert;
     glEffect->current_frag_raw = rawFrag;
 
@@ -2756,8 +2750,15 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
      * -flibit
      */
     if (!has_preshader)
+    {
         MOJOSHADER_glBindShaders(glEffect->current_vert,
                                  glEffect->current_frag);
+        if (glEffect->current_frag_raw != NULL)
+        {
+            glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
+            glEffect->effect->state_changes->sampler_state_change_count = rawFrag->sampler_count;
+        } // if
+    } // if
 
     MOJOSHADER_glEffectCommitChanges(glEffect);
 } // MOJOSHADER_glEffectBeginPass
@@ -2813,8 +2814,15 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     SELECT_SHADER_FROM_PRESHADER(rawFrag, glEffect->current_frag)
     #undef SELECT_SHADER_FROM_PRESHADER
     if (selector_ran)
+    {
         MOJOSHADER_glBindShaders(glEffect->current_vert,
                                  glEffect->current_frag);
+        if (glEffect->current_frag_raw != NULL)
+        {
+            glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
+            glEffect->effect->state_changes->sampler_state_change_count = rawFrag->sampler_count;
+        } // if
+    } // if
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
