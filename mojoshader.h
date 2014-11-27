@@ -437,7 +437,7 @@ typedef struct MOJOSHADER_preshaderInstruction
     MOJOSHADER_preshaderOpcode opcode;
     unsigned int element_count;
     unsigned int operand_count;
-    MOJOSHADER_preshaderOperand operands[3];
+    MOJOSHADER_preshaderOperand operands[4];
 } MOJOSHADER_preshaderInstruction;
 
 typedef struct MOJOSHADER_preshader
