@@ -347,6 +347,7 @@ static void readvalue(const uint8 *base,
     else if (class == MOJOSHADER_SYMCLASS_STRUCT)
     {
         /* TODO: Maybe this is like parse_ctab_typeinfo? -flibit */
+        assert(0 && "Effect struct value parsing not implemented!");
     } // else if
 } // readvalue
 
@@ -753,7 +754,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                 object->mapping.name = str;
             } // if
         } // else if
-        else
+        else if (object->type != MOJOSHADER_SYMTYPE_VOID) // FIXME: Why? -flibit
         {
             assert(0 && "Large object type unknown!");
         } // else
