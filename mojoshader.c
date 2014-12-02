@@ -9492,7 +9492,7 @@ const MOJOSHADER_parseData *MOJOSHADER_parse(const char *profile,
     // parse out the rest of the tokens after the version token...
     while (ctx->tokencount > 0)
     {
-        if (ctx->know_shader_size)
+        if (!ctx->know_shader_size)
             ctx->tokencount = 0xFFFFFFFF;  // keep this value obscenely large.
 
         // reset for each token.
