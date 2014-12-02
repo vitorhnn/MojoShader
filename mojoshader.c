@@ -6867,6 +6867,35 @@ static int parse_args_DCL(Context *ctx)
             ctx->dwords[0] = usage;
             ctx->dwords[1] = index;
         } // if
+        else if (regtype == REG_TYPE_TEXTURE)
+        {
+            const uint32 usage = (token & 0xF);
+            const uint32 index = ((token >> 16) & 0xF);
+            if (usage == MOJOSHADER_USAGE_TEXCOORD)
+            {
+                if (index > 7)
+                    fail(ctx, "DCL texcoord usage must have 0-7 index");
+            } // if
+            else if (usage == MOJOSHADER_USAGE_COLOR)
+            {
+                if (index != 0)
+                    fail(ctx, "DCL texcoord usage must have 0 index");
+            } // else if
+            else
+                fail(ctx, "Invalid DCL texture usage");
+
+            reserved_mask = 0x7FF0FFE0;
+            ctx->dwords[0] = usage;
+            ctx->dwords[1] = index;
+        } // else if
+        else if (regtype == REG_TYPE_SAMPLER)
+        {
+            const uint32 ttype = ((token >> 27) & 0xF);
+            if (!valid_texture_type(ttype))
+                fail(ctx, "Unknown sampler texture type");
+            reserved_mask = 0x7FFFFFFF;
+            ctx->dwords[0] = ttype;
+        } // else if
         else
         {
             unsupported = 1;
@@ -7110,14 +7139,19 @@ static void state_DCL(Context *ctx)
 
     else if (shader_is_vertex(ctx))
     {
-        const MOJOSHADER_usage usage = (const MOJOSHADER_usage) ctx->dwords[0];
-        const int index = ctx->dwords[1];
-        if (usage >= MOJOSHADER_USAGE_TOTAL)
+        if (regtype == REG_TYPE_SAMPLER)
+            add_sampler(ctx, regnum, (TextureType) ctx->dwords[0], 0);
+        else
         {
-            fail(ctx, "unknown DCL usage");
-            return;
-        } // if
-        add_attribute_register(ctx, regtype, regnum, usage, index, wmask, mods);
+            const MOJOSHADER_usage usage = (const MOJOSHADER_usage) ctx->dwords[0];
+            const int index = ctx->dwords[1];
+            if (usage >= MOJOSHADER_USAGE_TOTAL)
+            {
+                fail(ctx, "unknown DCL usage");
+                return;
+            } // if
+            add_attribute_register(ctx, regtype, regnum, usage, index, wmask, mods);
+        } // else
     } // if
 
     else if (shader_is_pixel(ctx))
