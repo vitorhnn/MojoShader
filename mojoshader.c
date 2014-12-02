@@ -2250,7 +2250,20 @@ static void output_GLSL_uniform_array(Context *ctx, const RegisterType regtype,
     {
         char buf[64];
         get_GLSL_uniform_array_varname(ctx, regtype, buf, sizeof (buf));
-        output_line(ctx, "uniform vec4 %s[%d];", buf, size);
+        /* FIXME: This was added to fix bool arrays.
+         * But, bool registers seem to be totally misaligned with the actual
+         * array size, i.e. bool[2], one at register 0 and one at register 11?!
+         * -flibit
+         */
+        const char *typ;
+        switch (regtype)
+        {
+            case REG_TYPE_CONST: typ = "vec4"; break;
+            case REG_TYPE_CONSTINT: typ ="ivec4"; break; // !!! FIXME: Unverified!
+            case REG_TYPE_CONSTBOOL: typ = "bool"; break;
+            default: fail(ctx, "BUG: used a uniform we don't know how to define.");
+        } // switch
+        output_line(ctx, "uniform %s %s[%d];", typ, buf, size);
     } // if
 } // output_GLSL_uniform_array
 
