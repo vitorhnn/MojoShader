@@ -2662,6 +2662,13 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                 else
                     fail(ctx, "unsupported color index");
             } // else if
+
+            else if (usage == MOJOSHADER_USAGE_DEPTH) // !!! FIXME: Possibly more! -flibit
+            {
+                push_output(ctx, &ctx->globals);
+                output_line(ctx, "attribute vec4 %s;", var);
+                pop_output(ctx);
+            } // else if
         } // else if
 
         else if (regtype == REG_TYPE_MISCTYPE)
