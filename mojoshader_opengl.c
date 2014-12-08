@@ -2772,7 +2772,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     void *data;
     uint32 start;
     uint32 len;
-    uint32 curBool;
     const MOJOSHADER_preshader *preshader;
     float selector;
     int shader_object;
@@ -2828,7 +2827,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
         if (raw != NULL) \
-            curBool = 0; \
             for (i = 0; i < raw->shader->symbol_count; i++) \
             { \
                 sym = &raw->shader->symbols[i]; \
@@ -2867,11 +2865,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                             ctx->regf[start + j] = (float) ((uint32 *) data)[j]; \
                 } \
                 else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL) \
-                { \
                     for (j = 0; j < len; j++) \
-                        ctx->regb[curBool + j] = ((uint32 *) data)[j]; \
-                    curBool++; \
-                } \
+                        ctx->regb[start + j] = ((uint32 *) data)[j]; \
             } // for
     COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
     COPY_PARAMETER_DATA(rawFrag, ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
