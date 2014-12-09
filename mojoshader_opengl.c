@@ -2766,7 +2766,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 
 void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 {
-    int i, j;
+    int i, j, k;
     MOJOSHADER_symbol *sym;
     MOJOSHADER_effectParam *param;
     void *data;
@@ -2840,9 +2840,10 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     len *= 4; \
                     if (param->value.element_count > 0) \
                         for (j = 0; j < param->value.element_count; j++) \
-                            memcpy(ctx->regf + start + (j * 4), \
-                                   data + (j * 4 * param->value.row_count * param->value.column_count), \
-                                   len / param->value.element_count); \
+                            for (k = 0; k < param->value.row_count; k++) \
+                                memcpy(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
+                                       data + (j * 4 * param->value.row_count * param->value.column_count) + (k * param->value.column_count), \
+                                       len / param->value.element_count / param->value.column_count); \
                     else \
                         memcpy(ctx->regf + start, data, len); \
 		} \
