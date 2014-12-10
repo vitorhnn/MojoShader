@@ -2825,6 +2825,12 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     } // if
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
+    memset(ctx->vs_reg_file_f, '\0', sizeof(ctx->vs_reg_file_f));
+    memset(ctx->vs_reg_file_i, '\0', sizeof(ctx->vs_reg_file_i));
+    memset(ctx->vs_reg_file_b, '\0', sizeof(ctx->vs_reg_file_b));
+    memset(ctx->ps_reg_file_f, '\0', sizeof(ctx->ps_reg_file_f));
+    memset(ctx->ps_reg_file_i, '\0', sizeof(ctx->ps_reg_file_i));
+    memset(ctx->ps_reg_file_b, '\0', sizeof(ctx->ps_reg_file_b));
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
         if (raw != NULL) \
             for (i = 0; i < raw->shader->symbol_count; i++) \
