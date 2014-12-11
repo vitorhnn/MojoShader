@@ -2261,7 +2261,11 @@ static void output_GLSL_uniform_array(Context *ctx, const RegisterType regtype,
             case REG_TYPE_CONST: typ = "vec4"; break;
             case REG_TYPE_CONSTINT: typ ="ivec4"; break; // !!! FIXME: Unverified!
             case REG_TYPE_CONSTBOOL: typ = "bool"; break;
-            default: fail(ctx, "BUG: used a uniform we don't know how to define.");
+            default:
+            {
+                fail(ctx, "BUG: used a uniform we don't know how to define.");
+                return;
+            } // default
         } // switch
         output_line(ctx, "uniform %s %s[%d];", typ, buf, size);
     } // if
