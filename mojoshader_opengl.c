@@ -2825,12 +2825,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     } // if
 
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
-    memset(ctx->vs_reg_file_f, '\0', sizeof(ctx->vs_reg_file_f));
-    memset(ctx->vs_reg_file_i, '\0', sizeof(ctx->vs_reg_file_i));
-    memset(ctx->vs_reg_file_b, '\0', sizeof(ctx->vs_reg_file_b));
-    memset(ctx->ps_reg_file_f, '\0', sizeof(ctx->ps_reg_file_f));
-    memset(ctx->ps_reg_file_i, '\0', sizeof(ctx->ps_reg_file_i));
-    memset(ctx->ps_reg_file_b, '\0', sizeof(ctx->ps_reg_file_b));
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
         if (raw != NULL) \
             for (i = 0; i < raw->shader->symbol_count; i++) \
@@ -2845,11 +2839,23 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     start *= 4; \
                     len *= 4; \
                     if (param->value.element_count > 0) \
-                        for (j = 0; j < param->value.element_count; j++) \
-                            for (k = 0; k < param->value.row_count; k++) \
-                                memcpy(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
-                                       data + (j * 4 * param->value.row_count * param->value.column_count) + (k * 4 * param->value.row_count), \
-                                       len / param->value.element_count / param->value.column_count); \
+                    { \
+                        if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
+                            for (j = 0; j < param->value.element_count; j++) \
+                                for (k = 0; k < param->value.row_count; k++) \
+                                { \
+                                    memset(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
+                                           '\0', 16); \
+                                    memcpy(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
+                                           data + (j * 4 * param->value.row_count * param->value.column_count) + (k * 4 * param->value.row_count), \
+                                           len / param->value.element_count / param->value.column_count); \
+                                } \
+                       else \
+                           for (j = 0; j < param->value.element_count; j++) \
+                               memcpy(ctx->regf + start + (j * 4), \
+                                      data + (j * 4 * param->value.row_count * param->value.column_count), \
+                                      len / param->value.element_count); \
+                    } \
                     else \
                         memcpy(ctx->regf + start, data, len); \
 		} \
