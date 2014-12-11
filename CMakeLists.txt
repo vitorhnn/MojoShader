@@ -17,6 +17,7 @@ ENDIF()
 # Linker Flags
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
+	SET(LIBM m)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 # Defines
@@ -32,4 +33,4 @@ SET(MOJOSHADER_SRC
 
 # Targets
 ADD_LIBRARY(mojoshader SHARED ${MOJOSHADER_SRC})
-TARGET_LINK_LIBRARIES(mojoshader m)
+TARGET_LINK_LIBRARIES(mojoshader ${LIBM})
