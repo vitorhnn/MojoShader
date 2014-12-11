@@ -2847,11 +2847,9 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
                             for (j = 0; j < param->value.element_count; j++) \
                                 for (k = 0; k < param->value.row_count; k++) \
-                                { \
                                     memcpy(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
                                            data + (j * 4 * param->value.row_count * param->value.column_count) + (k * 4 * param->value.row_count), \
                                            len / param->value.element_count / param->value.column_count); \
-                                } \
                        else \
                            for (j = 0; j < param->value.element_count; j++) \
                                memcpy(ctx->regf + start + (j * 4), \
