@@ -2827,6 +2827,10 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
         if (raw != NULL) \
+        { \
+            memset(ctx->regf, '\0', sizeof(ctx->regf)); \
+            memset(ctx->regi, '\0', sizeof(ctx->regi)); \
+            memset(ctx->regb, '\0', sizeof(ctx->regb)); \
             for (i = 0; i < raw->shader->symbol_count; i++) \
             { \
                 sym = &raw->shader->symbols[i]; \
@@ -2844,8 +2848,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                             for (j = 0; j < param->value.element_count; j++) \
                                 for (k = 0; k < param->value.row_count; k++) \
                                 { \
-                                    memset(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
-                                           '\0', 16); \
                                     memcpy(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
                                            data + (j * 4 * param->value.row_count * param->value.column_count) + (k * 4 * param->value.row_count), \
                                            len / param->value.element_count / param->value.column_count); \
@@ -2880,7 +2882,8 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL) \
                     for (j = 0; j < len; j++) \
                         ctx->regb[start + j] = ((uint32 *) data)[j]; \
-            } // for
+            } \
+        }
     COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
     COPY_PARAMETER_DATA(rawFrag, ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
     #undef COPY_PARAMETER_DATA
