@@ -2766,7 +2766,7 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 
 void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
 {
-    int i, j, k;
+    int i, j;
     MOJOSHADER_symbol *sym;
     MOJOSHADER_effectParam *param;
     void *data;
@@ -2778,6 +2778,12 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     int selector_ran = 0;
     MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
     MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
+
+    /* FIXME: Extra vars just for row-major matrix copies. Ugh. */
+    int r, c;
+    int elements;
+    float *regRow;
+    float *dataCol;
 
     /* For effect passes with arrays of shaders, we have to run a preshader
      * that determines which shader to use, based on a parameter's value.
@@ -2842,20 +2848,25 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 { \
                     start *= 4; \
                     len *= 4; \
-                    if (param->value.element_count > 0) \
+                    if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
                     { \
-                        if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
-                            for (j = 0; j < param->value.element_count; j++) \
-                                for (k = 0; k < param->value.row_count; k++) \
-                                    memcpy(ctx->regf + start + (j * 4 * param->value.row_count) + (k * 4), \
-                                           data + (j * 4 * param->value.row_count * param->value.column_count) + (k * 4 * param->value.row_count), \
-                                           len / param->value.element_count / param->value.column_count); \
-                       else \
-                           for (j = 0; j < param->value.element_count; j++) \
-                               memcpy(ctx->regf + start + (j * 4), \
-                                      data + (j * 4 * param->value.row_count * param->value.column_count), \
-                                      len / param->value.element_count); \
+                        elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
+                        for (j = 0; j < elements; j++) \
+                        { \
+                            dataCol = data + (j * 4 * param->value.row_count * param->value.column_count); \
+                            for (r = 0; r < param->value.row_count; r++) \
+                            { \
+                                regRow = ctx->regf + start + (j * 4 * param->value.row_count) + (r * 4); \
+                                for (c = 0; c < param->value.column_count; c++) \
+                                    regRow[c] = dataCol[r + (c * param->value.row_count)]; \
+                            } \
+                        } \
                     } \
+                    else if (param->value.element_count > 0) \
+                        for (j = 0; j < param->value.element_count; j++) \
+                            memcpy(ctx->regf + start + (j * 4), \
+                                   data + (j * 4 * param->value.row_count * param->value.column_count), \
+                                   len / param->value.element_count); \
                     else \
                         memcpy(ctx->regf + start, data, len); \
 		} \
