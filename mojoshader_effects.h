@@ -452,13 +452,13 @@ typedef union MOJOSHADER_effectObject
 /* Effect state change types... */
 
 /* Used to store sampler states with accompanying sampler registers */
-typedef struct MOJOSHADER_samplerStateRegister
+struct MOJOSHADER_samplerStateRegister
 {
     const char *sampler_name;
     unsigned int sampler_register;
     unsigned int sampler_state_count;
     const MOJOSHADER_effectSamplerState *sampler_states;
-} MOJOSHADER_samplerStateRegister;
+};
 
 /*
  * Used to acquire the desired render state by the effect pass.
