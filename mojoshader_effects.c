@@ -1158,7 +1158,7 @@ MOJOSHADER_preshader *copypreshader(const MOJOSHADER_preshader *src,
     // !!! FIXME: Out of memory check!
     memcpy(retval->instructions, src->instructions, siz);
 
-    siz = sizeof (float) * src->register_count;
+    siz = sizeof (float) * 4 * src->register_count;
     retval->register_count = src->register_count;
     retval->registers = (float *) m(siz, d);
     // !!! FIXME: Out of memory check!
@@ -1205,12 +1205,14 @@ MOJOSHADER_parseData *copyparsedata(const MOJOSHADER_parseData *src,
         retval->errors[i].error_position = src->errors[i].error_position;
     } // for
 
-    /* Copy profile string */
-    COPY_STRING(profile)
+    /* Copy profile string constant */
+    retval->profile = src->profile;
 
     /* Copy shader output */
-    COPY_STRING(output)
     retval->output_len = src->output_len;
+    stringcopy = (char *) m(src->output_len, d);
+    memcpy(stringcopy, src->output, src->output_len);
+    retval->output = stringcopy;
 
     /* Copy miscellaneous shader info */
     retval->instruction_count = src->instruction_count;
