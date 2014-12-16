@@ -2592,7 +2592,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
     } // for
 
     // Alloc shader information
-    retval->shaders = m(retval->num_shaders * sizeof (MOJOSHADER_glShader), d);
+    retval->shaders = (MOJOSHADER_glShader *) m(retval->num_shaders * sizeof (MOJOSHADER_glShader), d);
     if (retval->shaders == NULL)
     {
         f(retval, d);
@@ -2600,7 +2600,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
         return NULL;
     } // if
     memset(retval->shaders, '\0', retval->num_shaders * sizeof (MOJOSHADER_glShader));
-    retval->shader_indices = m(retval->num_shaders * sizeof (unsigned int), d);
+    retval->shader_indices = (unsigned int *) m(retval->num_shaders * sizeof (unsigned int), d);
     if (retval->shader_indices == NULL)
     {
         f(retval->shaders, d);
@@ -2613,7 +2613,7 @@ MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect)
     // Alloc preshader information
     if (retval->num_preshaders > 0)
     {
-        retval->preshader_indices = m(retval->num_preshaders * sizeof (unsigned int), d);
+        retval->preshader_indices = (unsigned int *) m(retval->num_preshaders * sizeof (unsigned int), d);
         if (retval->preshader_indices == NULL)
         {
             f(retval->shaders, d);
@@ -2853,7 +2853,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
                         for (j = 0; j < elements; j++) \
                         { \
-                            dataCol = data + (j * 4 * param->value.row_count * param->value.column_count); \
+                            dataCol = ((float *) data) + (j * 4 * param->value.row_count * param->value.column_count); \
                             for (r = 0; r < param->value.row_count; r++) \
                             { \
                                 regRow = ctx->regf + start + (j * 4 * param->value.row_count) + (r * 4); \
@@ -2865,11 +2865,11 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     else if (param->value.element_count > 0) \
                         for (j = 0; j < param->value.element_count; j++) \
                             memcpy(ctx->regf + start + (j * 4), \
-                                   data + (j * 4 * param->value.row_count * param->value.column_count), \
+                                   ((float *) data) + (j * 4 * param->value.row_count * param->value.column_count), \
                                    len / param->value.element_count); \
                     else \
                         memcpy(ctx->regf + start, data, len); \
-		} \
+                } \
                 else if (param->value.value_type == MOJOSHADER_SYMTYPE_INT) \
                 { \
                     start *= 4; \
@@ -2879,7 +2879,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         if (param->value.element_count > 0) \
                             for (j = 0; j < param->value.element_count; j++) \
                                 memcpy(ctx->regi + start + (j * 4), \
-                                       data + (j * 4 * param->value.row_count * param->value.column_count), \
+                                       ((uint32 *) data) + (j * 4 * param->value.row_count * param->value.column_count), \
                                        len / param->value.element_count); \
                         else \
                             memcpy(ctx->regi + start, data, len); \

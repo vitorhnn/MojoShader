@@ -272,8 +272,8 @@ typedef struct Profile
 
 // Convenience functions for allocators...
 #if !MOJOSHADER_FORCE_ALLOCATOR
-void *MOJOSHADER_internal_malloc(int bytes, void *d) { return malloc(bytes); }
-void MOJOSHADER_internal_free(void *ptr, void *d) { free(ptr); }
+void * MOJOSHADER_DELEGATECALL MOJOSHADER_internal_malloc(int bytes, void *d) { return malloc(bytes); }
+void MOJOSHADER_DELEGATECALL MOJOSHADER_internal_free(void *ptr, void *d) { free(ptr); }
 #endif
 
 MOJOSHADER_error MOJOSHADER_out_of_mem_error = {
@@ -316,12 +316,12 @@ static inline void Free(Context *ctx, void *ptr)
     ctx->free(ptr, ctx->malloc_data);
 } // Free
 
-static void *MallocBridge(int bytes, void *data)
+static void * MOJOSHADER_DELEGATECALL MallocBridge(int bytes, void *data)
 {
     return Malloc((Context *) data, (size_t) bytes);
 } // MallocBridge
 
-static void FreeBridge(void *ptr, void *data)
+static void MOJOSHADER_DELEGATECALL FreeBridge(void *ptr, void *data)
 {
     Free((Context *) data, ptr);
 } // FreeBridge
@@ -8143,7 +8143,7 @@ static void parse_constant_table(Context *ctx, const uint32 *tokens,
     // !!! FIXME: check that (start+target) points to "ps_3_0", etc.
 
     ctab->symbol_count = constants;
-    ctab->symbols = Malloc(ctx, sizeof (MOJOSHADER_symbol) * constants);
+    ctab->symbols = (MOJOSHADER_symbol *) Malloc(ctx, sizeof (MOJOSHADER_symbol) * constants);
     if (ctab->symbols == NULL)
         return;
     memset(ctab->symbols, '\0', sizeof (MOJOSHADER_symbol) * constants);

@@ -285,8 +285,8 @@ ssize_t buffer_find(Buffer *buffer, const size_t start,
 #define MOJOSHADER_internal_malloc NULL
 #define MOJOSHADER_internal_free NULL
 #else
-void *MOJOSHADER_internal_malloc(int bytes, void *d);
-void MOJOSHADER_internal_free(void *ptr, void *d);
+void * MOJOSHADER_DELEGATECALL MOJOSHADER_internal_malloc(int bytes, void *d);
+void MOJOSHADER_DELEGATECALL MOJOSHADER_internal_free(void *ptr, void *d);
 #endif
 
 #if MOJOSHADER_FORCE_INCLUDE_CALLBACKS

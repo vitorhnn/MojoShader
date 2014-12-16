@@ -256,24 +256,24 @@ static void readvalue(const uint8 *base,
     const uint8 *valptr = base + valoffset;
     unsigned int typelen = 9999999;  // !!! FIXME
     const uint32 type = readui32(&typeptr, &typelen);
-    const uint32 class = readui32(&typeptr, &typelen);
+    const uint32 valclass = readui32(&typeptr, &typelen);
     const uint32 name = readui32(&typeptr, &typelen);
     const uint32 semantic = readui32(&typeptr, &typelen);
     const uint32 numelements = readui32(&typeptr, &typelen);
 
     value->value_type = (MOJOSHADER_symbolType) type;
-    value->value_class = (MOJOSHADER_symbolClass) class;
+    value->value_class = (MOJOSHADER_symbolClass) valclass;
     value->name = readstring(base, name, m, d);
     value->semantic = readstring(base, semantic, m, d);
     value->element_count = numelements;
 
     /* Class sanity check */
-    assert(class >= MOJOSHADER_SYMCLASS_SCALAR && class <= MOJOSHADER_SYMCLASS_STRUCT);
+    assert(valclass >= MOJOSHADER_SYMCLASS_SCALAR && valclass <= MOJOSHADER_SYMCLASS_STRUCT);
 
-    if (class == MOJOSHADER_SYMCLASS_SCALAR
-     || class == MOJOSHADER_SYMCLASS_VECTOR
-     || class == MOJOSHADER_SYMCLASS_MATRIX_ROWS
-     || class == MOJOSHADER_SYMCLASS_MATRIX_COLUMNS)
+    if (valclass == MOJOSHADER_SYMCLASS_SCALAR
+     || valclass == MOJOSHADER_SYMCLASS_VECTOR
+     || valclass == MOJOSHADER_SYMCLASS_MATRIX_ROWS
+     || valclass == MOJOSHADER_SYMCLASS_MATRIX_COLUMNS)
     {
         /* These classes only ever contain scalar values */
         assert(type >= MOJOSHADER_SYMTYPE_BOOL && type <= MOJOSHADER_SYMTYPE_FLOAT);
@@ -292,7 +292,7 @@ static void readvalue(const uint8 *base,
         value->values = m(siz, d);
         memcpy(value->values, valptr, siz);
     } // if
-    else if (class == MOJOSHADER_SYMCLASS_OBJECT)
+    else if (valclass == MOJOSHADER_SYMCLASS_OBJECT)
     {
         /* This class contains either samplers or "objects" */
         assert(type >= MOJOSHADER_SYMTYPE_STRING && type <= MOJOSHADER_SYMTYPE_VERTEXSHADER);
@@ -325,7 +325,7 @@ static void readvalue(const uint8 *base,
                           &state->value, objects,
                           m, d);
                 if (stype == MOJOSHADER_SAMP_TEXTURE)
-                    objects[state->value.valuesI[0]].type = type;
+                    objects[state->value.valuesI[0]].type = (MOJOSHADER_symbolType) type;
             } // for
         } // if
         else
@@ -341,10 +341,10 @@ static void readvalue(const uint8 *base,
             memcpy(value->values, valptr, siz);
 
             for (i = 0; i < value->value_count; i++)
-                objects[value->valuesI[i]].type = type;
+                objects[value->valuesI[i]].type = (MOJOSHADER_symbolType) type;
         } // else
     } // else if
-    else if (class == MOJOSHADER_SYMCLASS_STRUCT)
+    else if (valclass == MOJOSHADER_SYMCLASS_STRUCT)
     {
         /* TODO: Maybe this is like parse_ctab_typeinfo? -flibit */
         assert(0 && "Effect struct value parsing not implemented!");
@@ -589,8 +589,8 @@ static void readsmallobjects(const uint32 numsmallobjects,
                 if (object->shader.shader->symbols[j].register_set == MOJOSHADER_SYMREGSET_SAMPLER)
                     object->shader.sampler_count++;
             object->shader.param_count = object->shader.shader->symbol_count;
-            object->shader.params = m(object->shader.param_count * sizeof (uint32), d);
-            object->shader.samplers = m(object->shader.sampler_count * sizeof (MOJOSHADER_samplerStateRegister), d);
+            object->shader.params = (uint32 *) m(object->shader.param_count * sizeof (uint32), d);
+            object->shader.samplers = (MOJOSHADER_samplerStateRegister *) m(object->shader.sampler_count * sizeof (MOJOSHADER_samplerStateRegister), d);
             uint32 curSampler = 0;
             for (j = 0; j < object->shader.shader->symbol_count; j++)
             {
@@ -610,7 +610,7 @@ static void readsmallobjects(const uint32 numsmallobjects,
             if (object->shader.shader->preshader)
             {
                 object->shader.preshader_param_count = object->shader.shader->preshader->symbol_count;
-                object->shader.preshader_params = m(object->shader.preshader_param_count * sizeof (uint32), d);
+                object->shader.preshader_params = (uint32 *) m(object->shader.preshader_param_count * sizeof (uint32), d);
                 for (j = 0; j < object->shader.shader->preshader->symbol_count; j++)
                 {
                     object->shader.preshader_params[j] = findparameter(effect->params,
@@ -692,7 +692,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                                                                      m, f, d);
                 // !!! FIXME: check for errors.
                 object->shader.preshader_param_count = object->shader.preshader->symbol_count;
-                object->shader.preshader_params = m(object->shader.preshader_param_count * sizeof (uint32), d);
+                object->shader.preshader_params = (uint32 *) m(object->shader.preshader_param_count * sizeof (uint32), d);
                 for (j = 0; j < object->shader.preshader->symbol_count; j++)
                 {
                     object->shader.preshader_params[j] = findparameter(effect->params,
@@ -710,8 +710,8 @@ static void readlargeobjects(const uint32 numlargeobjects,
                     if (object->shader.shader->symbols[j].register_set == MOJOSHADER_SYMREGSET_SAMPLER)
                         object->shader.sampler_count++;
                 object->shader.param_count = object->shader.shader->symbol_count;
-                object->shader.params = m(object->shader.param_count * sizeof (uint32), d);
-                object->shader.samplers = m(object->shader.sampler_count * sizeof (MOJOSHADER_samplerStateRegister), d);
+                object->shader.params = (uint32 *) m(object->shader.param_count * sizeof (uint32), d);
+                object->shader.samplers = (MOJOSHADER_samplerStateRegister *) m(object->shader.sampler_count * sizeof (MOJOSHADER_samplerStateRegister), d);
                 uint32 curSampler = 0;
                 for (j = 0; j < object->shader.shader->symbol_count; j++)
                 {
@@ -731,7 +731,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                 if (object->shader.shader->preshader)
                 {
                     object->shader.preshader_param_count = object->shader.shader->preshader->symbol_count;
-                    object->shader.preshader_params = m(object->shader.preshader_param_count * sizeof (uint32), d);
+                    object->shader.preshader_params = (uint32 *) m(object->shader.preshader_param_count * sizeof (uint32), d);
                     for (j = 0; j < object->shader.shader->preshader->symbol_count; j++)
                     {
                         object->shader.preshader_params[j] = findparameter(effect->params,
@@ -789,7 +789,7 @@ MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
     if (f == NULL) f = MOJOSHADER_internal_free;
 
     /* malloc base effect structure */
-    MOJOSHADER_effect *retval = m(sizeof (MOJOSHADER_effect), d);
+    MOJOSHADER_effect *retval = (MOJOSHADER_effect *) m(sizeof (MOJOSHADER_effect), d);
     if (retval == NULL)
         return &MOJOSHADER_out_of_mem_effect;
     memset(retval, '\0', sizeof (*retval));
@@ -1536,7 +1536,8 @@ void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_effectParam *parameter,
                                         const unsigned int offset,
                                         const unsigned int len)
 {
-    memcpy(parameter->value.values + offset, data, len);
+    // !!! FIXME: uint32* case is arbitary, for Win32 -flibit
+    memcpy((uint32 *) parameter->value.values + offset, data, len);
 } // MOJOSHADER_effectSetRawValueHandle
 
 
@@ -1551,7 +1552,8 @@ void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
     {
         if (strcmp(name, effect->params[i].value.name) == 0)
         {
-            memcpy(effect->params[i].value.values + offset, data, len);
+            // !!! FIXME: uint32* case is arbitary, for Win32 -flibit
+            memcpy((uint32 *) effect->params[i].value.values + offset, data, len);
             return;
         } // if
     } // for
