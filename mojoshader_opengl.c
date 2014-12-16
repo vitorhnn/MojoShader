@@ -2853,7 +2853,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
                         for (j = 0; j < elements; j++) \
                         { \
-                            dataCol = ((float *) data) + (j * 4 * param->value.row_count * param->value.column_count); \
+                            dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count); \
                             for (r = 0; r < param->value.row_count; r++) \
                             { \
                                 regRow = ctx->regf + start + (j * 4 * param->value.row_count) + (r * 4); \
