@@ -2891,8 +2891,23 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                             ctx->regf[start + j] = (float) ((uint32 *) data)[j]; \
                 } \
                 else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL) \
-                    for (j = 0; j < len; j++) \
-                        ctx->regb[start + j] = ((uint32 *) data)[j]; \
+                { \
+                    if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
+                    { \
+                        start *= 4; \
+                        for (j = 0; j < len; j++) \
+                            ctx->regf[start + j] = (float) ((uint32 *) data)[j]; \
+                    } \
+                    else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
+                    { \
+                        start *= 4; \
+                        for (j = 0; j < len; j++) \
+                            ctx->regi[start + j] = ((uint32 *) data)[j]; \
+                    } \
+                    else \
+                        for (j = 0; j < len; j++) \
+                            ctx->regb[start + j] = ((uint32 *) data)[j]; \
+                } \
             } \
         }
     COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
