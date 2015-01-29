@@ -2234,16 +2234,11 @@ static void output_GLSL_uniform_array(Context *ctx, const RegisterType regtype,
     {
         char buf[64];
         get_GLSL_uniform_array_varname(ctx, regtype, buf, sizeof (buf));
-        /* FIXME: This was added to fix bool arrays.
-         * But, bool registers seem to be totally misaligned with the actual
-         * array size, i.e. bool[2], one at register 0 and one at register 11?!
-         * -flibit
-         */
         const char *typ;
         switch (regtype)
         {
             case REG_TYPE_CONST: typ = "vec4"; break;
-            case REG_TYPE_CONSTINT: typ ="ivec4"; break; // !!! FIXME: Unverified!
+            case REG_TYPE_CONSTINT: typ ="ivec4"; break;
             case REG_TYPE_CONSTBOOL: typ = "bool"; break;
             default:
             {
@@ -7536,8 +7531,6 @@ static void state_IF(Context *ctx)
     const RegisterType regtype = ctx->source_args[0].regtype;
     if ((regtype != REG_TYPE_PREDICATE) && (regtype != REG_TYPE_CONSTBOOL))
         fail(ctx, "IF src0 must be CONSTBOOL or PREDICATE");
-    //else if (!replicate_swizzle(ctx->source_args[0].swizzle))
-    //    fail(ctx, "IF src0 must have replicate swizzle");
     // !!! FIXME: track if nesting depth.
 } // state_IF
 
