@@ -2668,12 +2668,25 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect)
     void *d = glEffect->effect->malloc_data;
 
     for (i = 0; i < glEffect->num_shaders; i++)
+    {
+        /* Arbitarily add a reference to the refcount.
+         * We're going to be calling glDeleteShader so we can clean out the
+         * program cache, but we can NOT let it free() the array elements!
+         * We'll do that ourselves, as we malloc()'d in CompileEffect.
+         * -flibit
+         */
+        glEffect->shaders[i].refcount++;
+        MOJOSHADER_glDeleteShader(&glEffect->shaders[i]);
+
+        /* Delete the shader, but do NOT delete the parse data!
+         * The parse data belongs to the parent effect.
+         * -flibit
+         */
         ctx->profileDeleteShader(glEffect->shaders[i].handle);
+    } // for
 
     f(glEffect->shader_indices, d);
     f(glEffect->preshader_indices, d);
-    // !!! FIXME: This gets deleted later, but only if the shader was bound.
-    // f(glEffect->shaders, d);
     f(glEffect, d);
 } // MOJOSHADER_glDeleteEffect
 
