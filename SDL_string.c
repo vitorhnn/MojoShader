@@ -30,6 +30,11 @@
 /* This file contains portable string manipulation functions for SDL */
 
 #include "SDL_stdinc.h"
+/* MojoShader change! */
+#ifdef _WIN32
+int SDL_isdigit(int x) { return ((x) >= '0') && ((x) <= '9'); }
+int SDL_isspace(int x) { return ((x) == ' ') || ((x) == '\t') || ((x) == '\r') || ((x) == '\n') || ((x) == '\f') || ((x) == '\v'); }
+#endif
 
 
 #define SDL_isupperhex(X)   (((X) >= 'A') && ((X) <= 'F'))
@@ -526,6 +531,7 @@ SDL_strlcat(SDL_INOUT_Z_CAP(maxlen) char *dst, const char *src, size_t maxlen)
 #endif /* HAVE_STRLCAT */
 }
 
+#if 0 /* Begin MojoShader change! */
 char *
 SDL_strdup(const char *string)
 {
@@ -540,6 +546,7 @@ SDL_strdup(const char *string)
     return newstr;
 #endif /* HAVE_STRDUP */
 }
+#endif /* End MojoShader change! */
 
 char *
 SDL_strrev(char *string)
