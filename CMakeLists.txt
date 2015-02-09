@@ -30,7 +30,7 @@ ELSEIF(APPLE)
 ENDIF()
 
 # Defines
-ADD_DEFINITIONS(-DMOJOSHADER_NO_VERSION_INCLUDE)
+ADD_DEFINITIONS(-DMOJOSHADER_NO_VERSION_INCLUDE -DMOJOSHADER_NO_VSNPRINTF)
 
 # Source Lists
 SET(MOJOSHADER_SRC
@@ -38,6 +38,7 @@ SET(MOJOSHADER_SRC
 	mojoshader_common.c
 	mojoshader_opengl.c
 	mojoshader_effects.c
+	SDL_string.c
 )
 
 # Targets
