@@ -1585,8 +1585,8 @@ void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
 } // MOJOSHADER_effectSetTechnique
 
 
-const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextTechnique(const MOJOSHADER_effect *effect,
-                                                                     const MOJOSHADER_effectTechnique *technique
+const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
+                                                                          const MOJOSHADER_effectTechnique *technique
 )
 {
     int i;

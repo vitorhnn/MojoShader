@@ -674,8 +674,8 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect
  *
  * This function is thread safe.
  */
-MOJOSHADER_EXPORTFN MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
-                                                                                        const MOJOSHADER_effectTechnique *technique);
+MOJOSHADER_EXPORTFN const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
+                                                                                              const MOJOSHADER_effectTechnique *technique);
 
 
 /* OpenGL effect interface... */
