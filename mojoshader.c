@@ -2212,10 +2212,15 @@ static void emit_GLSL_end(Context *ctx)
         set_used_register(ctx, REG_TYPE_COLOROUT, 0, 1);
         output_line(ctx, "%s_oC0 = %s_r0;", shstr, shstr);
     } // if
-#ifdef MOJOSHADER_FLIP_RENDERTARGET
     else if (shader_is_vertex(ctx))
+    {
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
         output_line(ctx, "gl_Position.y = gl_Position.y * vpFlip;");
 #endif
+#ifdef MOJOSHADER_DEPTH_CLIPPING
+        output_line(ctx, "gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;");
+#endif
+    } // else if
 
     // force a RET opcode if we're at the end of the stream without one.
     if (ctx->previous_opcode != OPCODE_RET)

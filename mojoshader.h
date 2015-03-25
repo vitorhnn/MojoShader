@@ -3092,6 +3092,7 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glProgramReady(void);
  * -flibit
  */
 #define MOJOSHADER_FLIP_RENDERTARGET
+#define MOJOSHADER_DEPTH_CLIPPING
 // !!! FIXME: Document me.
 MOJOSHADER_EXPORTFN void MOJOSHADER_glProgramViewportFlip(int flip);
 
