@@ -804,7 +804,19 @@ MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
 
     /* Read in header magic, seek to initial offset */
     const uint8 *base = NULL;
-    if (readui32(&ptr, &len) != 0xFEFF0901)
+    uint32 header = readui32(&ptr, &len);
+    if (header == 0xBCF00BCF)
+    {
+        /* The Effect compiler provided with XNA4 adds some extra mess at the
+         * beginning of the file. It's useless though, so just skip it.
+         * -flibit
+         */
+        const uint32 skip = readui32(&ptr, &len) - 8;
+        ptr += skip;
+        len += skip;
+        header = readui32(&ptr, &len);
+    } // if
+    if (header != 0xFEFF0901)
         goto parseEffect_notAnEffectsFile;
     else
     {
