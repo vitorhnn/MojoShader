@@ -339,8 +339,10 @@ extern DECLSPEC int SDLCALL SDL_abs(int x);
 
 extern DECLSPEC int SDLCALL SDL_isdigit(int x);
 extern DECLSPEC int SDLCALL SDL_isspace(int x);
+/* MojoShader change!
 extern DECLSPEC int SDLCALL SDL_toupper(int x);
 extern DECLSPEC int SDLCALL SDL_tolower(int x);
+*/
 
 extern DECLSPEC void *SDLCALL SDL_memset(SDL_OUT_BYTECAP(len) void *dst, int c, size_t len);
 
