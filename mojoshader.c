@@ -8547,6 +8547,9 @@ static void parse_preshader(Context *ctx, uint32 tokcount)
         inst++;
     } // while
 
+    // Registers need to be vec4, round up to nearest 4
+    preshader->temp_count = (preshader->temp_count + 3) & ~3;
+
     unsigned int largest = 0;
     const MOJOSHADER_symbol *sym = preshader->symbols;
     int i;
@@ -9944,6 +9947,9 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
 
         inst++;
     } // while
+
+    // Registers need to be vec4, round up to nearest 4
+    preshader->temp_count = (preshader->temp_count + 3) & ~3;
 
     unsigned int largest = 0;
     const MOJOSHADER_symbol *sym = preshader->symbols;

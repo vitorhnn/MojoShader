@@ -184,8 +184,8 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
         // Figure out where dst wants to be stored.
         if (operand->type == MOJOSHADER_PRESHADEROPERAND_TEMP)
         {
-            //assert(preshader->temp_count >=
-            //        operand->index + (elemsbytes / sizeof (double)));
+            assert(preshader->temp_count >=
+                    operand->index + (elemsbytes / sizeof (double)));
             memcpy(temps + operand->index, dst, elemsbytes);
         } // if
         else
