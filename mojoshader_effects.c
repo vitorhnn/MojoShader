@@ -173,6 +173,7 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
                     final += src0[i] * src1[i];
                 for (i = 0; i < elems; i++)
                     dst[i] = final;  // !!! FIXME: is this right?
+                break;
             } // case
 
             default:
