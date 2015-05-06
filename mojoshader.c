@@ -9911,6 +9911,7 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
 
                 case 4:
                 {
+                    operand->type = MOJOSHADER_PRESHADEROPERAND_OUTPUT;
                     if (!prsi.seen)
                         // No PRSI tokens, no output map.
                         continue;
@@ -9924,8 +9925,6 @@ const MOJOSHADER_preshader *MOJOSHADER_parsePreshader(const unsigned char *buf,
                     if (i == output_map_count)
                         // Bogus preshader output index
                         goto parsePreshader_notAPreshader;
-
-                    operand->type = MOJOSHADER_PRESHADEROPERAND_OUTPUT;
                     break;
                 } // case
 
