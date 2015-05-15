@@ -2864,10 +2864,11 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
                     { \
                         elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
+                        len = sym->register_count / elements; \
                         for (j = 0; j < elements; j++) \
                         { \
                             dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count); \
-                            for (r = 0; r < param->value.row_count; r++) \
+                            for (r = 0; r < len; r++) /* <= row_count */ \
                             { \
                                 regRow = ctx->regf + start + (j * 4 * param->value.row_count) + (r * 4); \
                                 for (c = 0; c < param->value.column_count; c++) \
@@ -2876,7 +2877,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         } \
                     } \
                     else if (param->value.element_count > 0) \
-                        for (j = 0; j < param->value.element_count; j++) \
+                        for (j = 0; j < sym->register_count; j++) /* <= element_count */ \
                             memcpy(ctx->regf + start + (j * 4), \
                                    ((float *) data) + (j * param->value.row_count * param->value.column_count), \
                                    len / param->value.element_count); \
@@ -2890,7 +2891,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     { \
                         len *= 4; \
                         if (param->value.element_count > 0) \
-                            for (j = 0; j < param->value.element_count; j++) \
+                            for (j = 0; j < sym->register_count; j++) /* <= element_count */ \
                                 memcpy(ctx->regi + start + (j * 4), \
                                        ((uint32 *) data) + (j * 4 * param->value.row_count * param->value.column_count), \
                                        len / param->value.element_count); \
