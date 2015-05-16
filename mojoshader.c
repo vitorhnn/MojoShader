@@ -2275,7 +2275,7 @@ static void emit_GLSL_finalize(Context *ctx)
     output_GLSL_uniform_array(ctx, REG_TYPE_CONSTBOOL, ctx->uniform_bool_count);
 #ifdef MOJOSHADER_FLIP_RENDERTARGET
     if (shader_is_vertex(ctx))
-        output_line(ctx, "uniform int vpFlip;");
+        output_line(ctx, "uniform float vpFlip;");
 #endif
     pop_output(ctx);
 } // emit_GLSL_finalize

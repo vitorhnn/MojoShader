@@ -216,6 +216,9 @@ struct MOJOSHADER_glContext
     PFNGLSHADERSOURCEPROC glShaderSource;
     PFNGLUNIFORM1IPROC glUniform1i;
     PFNGLUNIFORM1IVPROC glUniform1iv;
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+    PFNGLUNIFORM1FPROC glUniform1f;
+#endif
     PFNGLUNIFORM4FVPROC glUniform4fv;
     PFNGLUNIFORM4IVPROC glUniform4iv;
     PFNGLUSEPROGRAMPROC glUseProgram;
@@ -954,6 +957,9 @@ static void lookup_entry_points(MOJOSHADER_glGetProcAddress lookup, void *d)
     DO_LOOKUP(opengl_2, PFNGLSHADERSOURCEPROC, glShaderSource);
     DO_LOOKUP(opengl_2, PFNGLUNIFORM1IPROC, glUniform1i);
     DO_LOOKUP(opengl_2, PFNGLUNIFORM1IVPROC, glUniform1iv);
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
+    DO_LOOKUP(opengl_2, PFNGLUNIFORM1FPROC, glUniform1f);
+#endif
     DO_LOOKUP(opengl_2, PFNGLUNIFORM4FVPROC, glUniform4fv);
     DO_LOOKUP(opengl_2, PFNGLUNIFORM4IVPROC, glUniform4iv);
     DO_LOOKUP(opengl_2, PFNGLUSEPROGRAMPROC, glUseProgram);
@@ -2532,8 +2538,13 @@ void MOJOSHADER_glDestroyContext(MOJOSHADER_glContext *_ctx)
 
 void MOJOSHADER_glProgramViewportFlip(int flip)
 {
+    /* Some compilers require that vpFlip be a float value, rather than int.
+     * However, there's no real reason for it to be a float in the API, so we
+     * do a cast in here. That's not so bad, right...?
+     * -flibit
+     */
     if (ctx->bound_program->vs_flip_loc != -1)
-        ctx->glUniform1i(ctx->bound_program->vs_flip_loc, flip);
+        ctx->glUniform1f(ctx->bound_program->vs_flip_loc, (float) flip);
 }
 
 
