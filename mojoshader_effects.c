@@ -59,15 +59,15 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader *preshader,
             {
                 case MOJOSHADER_PRESHADEROPERAND_LITERAL:
                 {
-                    const double *lit = &preshader->literals[index];
-                    assert((index + elems - 1) <= preshader->literal_count);
                     if (!isscalar)
-                        memcpy(&src[opiter][0], lit, elemsbytes);
+                    {
+                        assert((index + elems) <= preshader->literal_count);
+                        memcpy(&src[opiter][0], &preshader->literals[index], elemsbytes);
+                    } // if
                     else
                     {
-                        const double val = *lit;
                         for (elemiter = 0; elemiter < elems; elemiter++)
-                            src[opiter][elemiter] = val;
+                            src[opiter][elemiter] = preshader->literals[index];
                     } // else
                     break;
                 } // case
