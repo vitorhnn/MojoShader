@@ -1737,7 +1737,7 @@ static void lookup_samplers(MOJOSHADER_glProgram *program,
         if (loc >= 0)  // maybe the Sampler was optimized out?
         {
 #ifdef MOJOSHADER_XNA4_VERTEX_TEXTURES
-            if (shader->parseData->shader_type == MOJOSHADER_TYPE_VERTEX)
+            if (pd->shader_type == MOJOSHADER_TYPE_VERTEX)
                 ctx->profilePushSampler(loc, s[i].index + ctx->vertex_sampler_offset);
             else
 #endif
