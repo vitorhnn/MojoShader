@@ -1121,14 +1121,6 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
         const char *str = (const char *) ctx->glGetString(GL_VERSION);
         parse_opengl_version_str(str, &ctx->opengl_major, &ctx->opengl_minor);
 
-#ifdef MOJOSHADER_XNA4_VERTEX_TEXTURES
-        GLint maxTextures;
-        GLint maxVertexTextures;
-        ctx->glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextures);
-        maxVertexTextures = ((maxTextures - 16) < 4) ? (maxTextures - 16) : 4;
-        ctx->vertex_sampler_offset = maxTextures - maxVertexTextures;
-#endif
-
         if ((ctx->have_opengl_3) && (opengl_version_atleast(3, 0)))
         {
             GLint i;
@@ -1405,6 +1397,14 @@ MOJOSHADER_glContext *MOJOSHADER_glCreateContext(const char *profile,
     load_extensions(lookup, lookup_d);
     if (!valid_profile(profile))
         goto init_fail;
+
+#ifdef MOJOSHADER_XNA4_VERTEX_TEXTURES
+        GLint maxTextures;
+        GLint maxVertexTextures;
+        ctx->glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextures);
+        maxVertexTextures = ((maxTextures - 16) < 4) ? (maxTextures - 16) : 4;
+        ctx->vertex_sampler_offset = maxTextures - maxVertexTextures;
+#endif
 
     MOJOSHADER_glBindProgram(NULL);
 
