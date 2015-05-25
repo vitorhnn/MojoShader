@@ -172,6 +172,11 @@ struct MOJOSHADER_glContext
     MOJOSHADER_glProgram *bound_program;
     char profile[16];
 
+#ifdef MOJOSHADER_XNA4_VERTEX_TEXTURES
+    // Vertex texture sampler offset...
+    int vertex_sampler_offset;
+#endif
+
     // Extensions...
     int have_core_opengl;
     int have_opengl_2;  // different entry points than ARB extensions.
@@ -1116,6 +1121,14 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
         const char *str = (const char *) ctx->glGetString(GL_VERSION);
         parse_opengl_version_str(str, &ctx->opengl_major, &ctx->opengl_minor);
 
+#ifdef MOJOSHADER_XNA4_VERTEX_TEXTURES
+        GLint maxTextures;
+        GLint maxVertexTextures;
+        ctx->glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextures);
+        maxVertexTextures = ((maxTextures - 16) < 4) ? (maxTextures - 16) : 4;
+        ctx->vertex_sampler_offset = maxTextures - maxVertexTextures;
+#endif
+
         if ((ctx->have_opengl_3) && (opengl_version_atleast(3, 0)))
         {
             GLint i;
@@ -1722,7 +1735,14 @@ static void lookup_samplers(MOJOSHADER_glProgram *program,
     {
         const GLint loc = ctx->profileGetSamplerLocation(program, shader, i);
         if (loc >= 0)  // maybe the Sampler was optimized out?
-            ctx->profilePushSampler(loc, s[i].index);
+        {
+#ifdef MOJOSHADER_XNA4_VERTEX_TEXTURES
+            if (shader->parseData->shader_type == MOJOSHADER_TYPE_VERTEX)
+                ctx->profilePushSampler(loc, s[i].index + ctx->vertex_sampler_offset);
+            else
+#endif
+                ctx->profilePushSampler(loc, s[i].index);
+        } // if
     } // for
 } // lookup_samplers
 
