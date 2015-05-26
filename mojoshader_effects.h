@@ -472,6 +472,10 @@ typedef struct MOJOSHADER_effectStateChanges
     /* Sampler state changes caused by effect technique */
     unsigned int sampler_state_change_count;
     const MOJOSHADER_samplerStateRegister *sampler_state_changes;
+
+    /* Vertex sampler state changes caused by effect technique */
+    unsigned int vertex_sampler_state_change_count;
+    const MOJOSHADER_samplerStateRegister *vertex_sampler_state_changes;
 } MOJOSHADER_effectStateChanges;
 
 

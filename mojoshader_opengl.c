@@ -2797,6 +2797,11 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
     {
         MOJOSHADER_glBindShaders(glEffect->current_vert,
                                  glEffect->current_frag);
+        if (glEffect->current_vert_raw != NULL)
+        {
+            glEffect->effect->state_changes->vertex_sampler_state_changes = rawVert->samplers;
+            glEffect->effect->state_changes->vertex_sampler_state_change_count = rawVert->sampler_count;
+        } // if
         if (glEffect->current_frag_raw != NULL)
         {
             glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
@@ -2867,6 +2872,11 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     {
         MOJOSHADER_glBindShaders(glEffect->current_vert,
                                  glEffect->current_frag);
+        if (glEffect->current_vert_raw != NULL)
+        {
+            glEffect->effect->state_changes->vertex_sampler_state_changes = rawVert->samplers;
+            glEffect->effect->state_changes->vertex_sampler_state_change_count = rawVert->sampler_count;
+        } // if
         if (glEffect->current_frag_raw != NULL)
         {
             glEffect->effect->state_changes->sampler_state_changes = rawFrag->samplers;
