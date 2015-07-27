@@ -2982,7 +2982,25 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                     data = param->value.values; \
                     len = param->value.value_count; \
                     if (param->value.value_type == MOJOSHADER_SYMTYPE_FLOAT) \
-                        memcpy(preshader->registers + start, data, len * 4); \
+                    { \
+                        if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
+                        { \
+                            elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
+                            len = sym->register_count / elements; \
+                            for (j = 0; j < elements; j++) \
+                            { \
+                                dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count); \
+                                for (r = 0; r < len; r++) /* <= row_count */ \
+                                { \
+                                    regRow = preshader->registers + start + (j * 4 * param->value.row_count) + (r * 4); \
+                                    for (c = 0; c < param->value.column_count; c++) \
+                                        regRow[c] = dataCol[r + (c * param->value.row_count)]; \
+                                } \
+                            } \
+                        } \
+                        else \
+                            memcpy(preshader->registers + start, data, len * 4); \
+                    } \
                     else \
                         for (j = 0; j < len; j++) \
                             preshader->registers[start + j] = (float) ((uint32 *) data)[j]; \
