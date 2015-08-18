@@ -102,6 +102,9 @@ struct MOJOSHADER_glProgram
 
     int uses_pointsize;
 
+    // 10 is apparently the resource limit according to SM3 -flibit
+    GLint vertex_attrib_loc[MOJOSHADER_USAGE_TOTAL][10];
+
     // GLSL uses these...location of uniform arrays.
     GLint vs_float4_loc;
     GLint vs_int4_loc;
@@ -160,6 +163,9 @@ struct MOJOSHADER_glContext
     GLint max_attrs;
     uint8 want_attr[32];
     uint8 have_attr[32];
+
+    // This shadows vertex attribute and divisor states.
+    GLuint attr_divisor[32];
 
     // rarely used, so we don't touch when we don't have to.
     int pointsize_enabled;
@@ -1782,6 +1788,7 @@ static int lookup_attributes(MOJOSHADER_glProgram *program)
             AttributeMap *map = &program->attributes[program->attribute_count];
             map->attribute = &a[i];
             map->location = loc;
+            program->vertex_attrib_loc[map->attribute->usage][map->attribute->index] = loc;
             program->attribute_count++;
 
             if (((size_t)loc) > STATICARRAYLEN(ctx->want_attr))
@@ -1842,6 +1849,7 @@ MOJOSHADER_glProgram *MOJOSHADER_glLinkProgram(MOJOSHADER_glShader *vshader,
     if (retval == NULL)
         goto link_program_fail;
     memset(retval, '\0', sizeof (MOJOSHADER_glProgram));
+    memset(retval->vertex_attrib_loc, 0xFF, sizeof(retval->vertex_attrib_loc));
 
     numregs = 0;
     if (vshader != NULL) numregs += vshader->parseData->uniform_count;
@@ -2288,27 +2296,10 @@ void MOJOSHADER_glSetVertexAttribute(MOJOSHADER_usage usage,
 
     const GLenum gl_type = opengl_attr_type(type);
     const GLboolean norm = (normalized) ? GL_TRUE : GL_FALSE;
-    const int count = ctx->bound_program->attribute_count;
-    GLint gl_index = 0;
-    int i;
+    const GLint gl_index = ctx->bound_program->vertex_attrib_loc[usage][index];
 
-    for (i = 0; i < count; i++)
-    {
-        const AttributeMap *map = &ctx->bound_program->attributes[i];
-        const MOJOSHADER_attribute *a = map->attribute;
-
-        // !!! FIXME: is this array guaranteed to be sorted by usage?
-        // !!! FIXME:  if so, we can break if a->usage > usage.
-
-        if ((a->usage == usage) && (a->index == index))
-        {
-            gl_index = map->location;
-            break;
-        } // if
-    } // for
-
-    if (i == count)
-        return;  // nothing to do, this shader doesn't use this stream.
+    if (gl_index == -1)
+        return; // Nothing to do, this shader doesn't use this stream.
 
     // this happens to work in both ARB1 and GLSL, but if something alien
     //  shows up, we'll have to split these into profile*() functions.
@@ -2330,30 +2321,16 @@ void MOJOSHADER_glSetVertexAttribDivisor(MOJOSHADER_usage usage,
     if ((ctx->bound_program == NULL) || (ctx->bound_program->vertex == NULL))
         return;
 
-    const int count = ctx->bound_program->attribute_count;
-    GLint gl_index = 0;
-    int i;
+    const GLint gl_index = ctx->bound_program->vertex_attrib_loc[usage][index];
 
-    for (i = 0; i < count; i++)
+    if (gl_index == -1)
+        return; // Nothing to do, this shader doesn't use this stream.
+
+    if (divisor != ctx->attr_divisor[gl_index])
     {
-        const AttributeMap *map = &ctx->bound_program->attributes[i];
-        const MOJOSHADER_attribute *a = map->attribute;
-
-        // !!! FIXME: is this array guaranteed to be sorted by usage?
-        // !!! FIXME:  if so, we can break if a->usage > usage.
-
-        if ((a->usage == usage) && (a->index == index))
-        {
-            gl_index = map->location;
-            break;
-        } // if
-    } // for
-
-    if (i == count)
-        return;  // nothing to do, this shader doesn't use this stream.
-
-    ctx->glVertexAttribDivisorARB(gl_index, divisor);
-
+        ctx->glVertexAttribDivisorARB(gl_index, divisor);
+        ctx->attr_divisor[gl_index] = divisor;
+    } // if
 } // MOJOSHADER_glSetVertexAttribDivisor
 
 
