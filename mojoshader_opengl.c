@@ -2284,6 +2284,15 @@ static inline GLenum opengl_attr_type(const MOJOSHADER_attributeType type)
 } // opengl_attr_type
 
 
+int MOJOSHADER_glGetVertexAttribLocation(MOJOSHADER_usage usage, int index)
+{
+    if ((ctx->bound_program == NULL) || (ctx->bound_program->vertex == NULL))
+        return -1;
+
+    return ctx->bound_program->vertex_attrib_loc[usage][index];
+} // MOJOSHADER_glGetVertexAttribLocation
+
+
 // !!! FIXME: shouldn't (index) be unsigned?
 void MOJOSHADER_glSetVertexAttribute(MOJOSHADER_usage usage,
                                      int index, unsigned int size,

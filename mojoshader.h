@@ -3021,6 +3021,20 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glSetLegacyBumpMapEnv(unsigned int sampler, 
                                                           float lscale, float loffset);
 
 /*
+ * Return the location of a vertex attribute for the currently-bound program.
+ *
+ * (usage) and (index) map to Direct3D vertex declaration values: COLOR1 would
+ *  be MOJOSHADER_USAGE_COLOR and 1.
+ *
+ * The return value is the index of the attribute to be sent to
+ *  glVertexAttribPointer, or -1 if the stream is not used.
+ *
+ * This call requires a valid MOJOSHADER_glContext to have been made current,
+ *  or it will crash your program. See MOJOSHADER_glMakeContextCurrent().
+ */
+MOJOSHADER_EXPORTFN int MOJOSHADER_glGetVertexAttribLocation(MOJOSHADER_usage usage, int index);
+
+/*
  * Connect a client-side array to the currently-bound program.
  *
  * (usage) and (index) map to Direct3D vertex declaration values: COLOR1 would
@@ -3053,7 +3067,8 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glSetVertexAttribute(MOJOSHADER_usage usage,
                                                          int normalized, unsigned int stride,
                                                          const void *ptr);
 
-/* Modify the rate at which this vertex attribute advances during instanced
+/*
+ *  Modify the rate at which this vertex attribute advances during instanced
  *  rendering.
  *
  * This should be called alongside glSetVertexAttribute, as this does not flag
