@@ -4,11 +4,9 @@ For more information about MojoShader, visit the website:
 
 http://icculus.org/mojoshader/
 
-Odds are, unless you're working on this FNA task...
+Odds are, unless you're working on FNA, this repository is useless to you.
 
-https://github.com/flibitijibibo/FNA/issues/247
-
-... this repository is useless to you.
-
+If you're building on Windows, take the SDL2 headers and throw them into
+MojoShader/SDL2/, then the project should build.
 
 -flibit
