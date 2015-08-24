@@ -2931,14 +2931,15 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 } \
                 else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL) \
                 { \
+                    /* register_count <= len */ \
                     if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                        for (j = 0; j < len; j++) \
+                        for (j = 0; j < sym->register_count; j++) \
                             ctx->regf[(start + j) * 4] = (float) ((uint32 *) data)[j]; \
                     else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                        for (j = 0; j < len; j++) \
+                        for (j = 0; j < sym->register_count; j++) \
                             ctx->regi[(start + j) * 4] = ((uint32 *) data)[j]; \
                     else \
-                        for (j = 0; j < len; j++) \
+                        for (j = 0; j < sym->register_count; j++) \
                             ctx->regb[start + j] = ((uint32 *) data)[j]; \
                 } \
             } \
