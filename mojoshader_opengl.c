@@ -2920,7 +2920,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                         if (param->value.element_count > 0) \
                             for (j = 0; j < sym->register_count; j++) /* <= element_count */ \
                                 memcpy(ctx->regi + start + (j * 4), \
-                                       ((uint32 *) data) + (j * 4 * param->value.row_count * param->value.column_count), \
+                                       ((uint32 *) data) + (j * param->value.row_count * param->value.column_count), \
                                        len / param->value.element_count); \
                         else \
                             memcpy(ctx->regi + start, data, len); \
@@ -2932,17 +2932,11 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL) \
                 { \
                     if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                    { \
-                        start *= 4; \
                         for (j = 0; j < len; j++) \
-                            ctx->regf[start + j] = (float) ((uint32 *) data)[j]; \
-                    } \
+                            ctx->regf[(start + j) * 4] = (float) ((uint32 *) data)[j]; \
                     else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                    { \
-                        start *= 4; \
                         for (j = 0; j < len; j++) \
-                            ctx->regi[start + j] = ((uint32 *) data)[j]; \
-                    } \
+                            ctx->regi[(start + j) * 4] = ((uint32 *) data)[j]; \
                     else \
                         for (j = 0; j < len; j++) \
                             ctx->regb[start + j] = ((uint32 *) data)[j]; \
