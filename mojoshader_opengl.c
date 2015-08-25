@@ -2843,14 +2843,14 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
 
             elements = (param->element_count < 1) ? 1 : param->element_count;
             len = sym->register_count / elements; /* <= row_count */
-            for (j = 0; j < elements; j++)
-            {
-                dataCol = ((float *) data) + (j * param->row_count * param->column_count);
-                regRow = regf + start + ((j * param->row_count) << 2);
+            dataCol = (float *) data;
+            regRow = regf + start;
+            for (j = 0; j < elements; j++,
+                 dataCol += j * param->row_count * param->column_count,
+                 regRow += (j * len) << 2)
                 for (r = 0; r < len; r++, regRow += 4)
                     for (c = 0; c < param->column_count; c++)
                         regRow[c] = dataCol[r + (c * param->row_count)];
-            } // for
             continue;
         } // if
 
@@ -2860,12 +2860,11 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             if (param->value_type != MOJOSHADER_SYMTYPE_FLOAT)
             {
                 regRow = regf + start;
-                for (j = 0; j < sym->register_count; j++, regRow += 4)
-                {
+                for (j = 0; j < sym->register_count; j++,
+                     data += param->column_count,
+                     regRow += 4)
                     for (c = 0; c < param->column_count; c++)
                         regRow[c] = (float) data[c];
-                    data += param->column_count;
-                } // for
                 continue;
             } // if
             // !!! FIXME: uint32* is arbitary, for Win32 -flibit
