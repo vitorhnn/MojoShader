@@ -2814,7 +2814,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
     uint32 *data;
     uint32 *dest;
 
-    /* FIXME: Extra vars just for uglier copies. Ugh. */
+    // Extra vars just for uglier copies. Ugh. -flibit
     int r, c;
     int elements;
     uint32 len;
@@ -2829,6 +2829,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
 
         start = sym->register_index;
         param = &params[param_loc[i]].value;
+        // !!! FIXME: uint32* is arbitary, for Win32 -flibit
         data = (uint32 *) param->values;
 
         // float/int registers are vec4, so they have 4 elements each
