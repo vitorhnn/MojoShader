@@ -7,6 +7,6 @@ http://icculus.org/mojoshader/
 Odds are, unless you're working on FNA, this repository is useless to you.
 
 If you're building on Windows, take the SDL2 headers and throw them into
-MojoShader/SDL2/, then the project should build.
+MojoShader/SDL2/, then the project should build with the C++ compiler.
 
 -flibit
