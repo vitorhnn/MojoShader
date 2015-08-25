@@ -2809,8 +2809,10 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
     MOJOSHADER_symbol *sym;
     MOJOSHADER_effectValue *param;
     uint32 start;
-    void *data;
-    void *dest;
+
+    // !!! FIXME: uint32* is arbitary, for Win32 -flibit
+    uint32 *data;
+    uint32 *dest;
 
     /* FIXME: Extra vars just for uglier copies. Ugh. */
     int r, c;
@@ -2827,7 +2829,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
 
         start = sym->register_index;
         param = &params[param_loc[i]].value;
-        data = param->values;
+        data = (uint32 *) param->values;
 
         // float/int registers are vec4, so they have 4 elements each
         start <<= 2;
@@ -2860,27 +2862,29 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                 for (j = 0; j < sym->register_count; j++, regRow += 4)
                 {
                     for (c = 0; c < param->column_count; c++)
-                        regRow[c] = (float) ((uint32 *) data)[c];
-                    data += param->column_count << 2;
+                        regRow[c] = (float) data[c];
+                    data += param->column_count;
                 } // for
                 continue;
             }
-            dest = regf + start;
+            // !!! FIXME: uint32* is arbitary, for Win32 -flibit
+            dest = (uint32 *) regf + start;
         }
         else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
-            dest = regi + start;
+            // !!! FIXME: uint32* is arbitary, for Win32 -flibit
+            dest = (uint32 *) regi + start;
         else // Should be SYMREGSET_BOOL with SYMTYPE_BOOL!
         {
             start >>= 2; // welp -flibit
             for (j = 0; j < sym->register_count; j++)
-                regb[start + j] = ((uint32 *) data)[j];
+                regb[start + j] = data[j];
             continue;
         } // else
 
         // Oh, look, it's a _simple_ copy!
-        for (j = 0; j < sym->register_count; j++, dest += 16)
+        for (j = 0; j < sym->register_count; j++, dest += 4)
             memcpy(dest,
-                   data + ((j * param->column_count) << 2),
+                   data + (j * param->column_count),
                    param->column_count << 2);
     } // for
 } // copy_parameter_data
