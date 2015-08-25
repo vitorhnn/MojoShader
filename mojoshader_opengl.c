@@ -2799,7 +2799,11 @@ void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
 } // MOJOSHADER_glEffectBeginPass
 
 
-void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
+static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
+                                       unsigned int *param_loc,
+                                       MOJOSHADER_symbol *symbols,
+                                       unsigned int symbol_count,
+                                       GLfloat *regf, GLint *regi, uint8 *regb)
 {
     int i, j;
     MOJOSHADER_symbol *sym;
@@ -2807,18 +2811,93 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     void *data;
     uint32 start;
     uint32 len;
-    const MOJOSHADER_preshader *preshader;
-    float selector;
-    int shader_object;
-    int selector_ran = 0;
-    MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
-    MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
 
     /* FIXME: Extra vars just for row-major matrix copies. Ugh. */
     int r, c;
     int elements;
     float *regRow;
     float *dataCol;
+
+    for (i = 0; i < symbol_count; i++)
+    {
+        sym = &symbols[i];
+        param = &params[param_loc[i]];
+        start = sym->register_index;
+        data = param->value.values;
+        len = param->value.value_count;
+        if (param->value.value_type == MOJOSHADER_SYMTYPE_FLOAT)
+        {
+            start *= 4;
+            len *= 4;
+            if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS)
+            {
+                elements = (param->value.element_count < 1) ? 1 : param->value.element_count;
+                len = sym->register_count / elements;
+                for (j = 0; j < elements; j++)
+                {
+                    dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count);
+                    for (r = 0; r < len; r++) /* <= row_count */
+                    {
+                        regRow = regf + start + (j * 4 * param->value.row_count) + (r * 4);
+                        for (c = 0; c < param->value.column_count; c++)
+                            regRow[c] = dataCol[r + (c * param->value.row_count)];
+                    } // for
+                } // for
+            } // if
+            else if (param->value.element_count > 0)
+                for (j = 0; j < sym->register_count; j++) /* <= element_count */
+                    memcpy(regf + start + (j * 4),
+                           ((float *) data) + (j * param->value.row_count * param->value.column_count),
+                           len / param->value.element_count);
+            else
+                memcpy(regf + start, data, len);
+        } // if
+        else if (param->value.value_type == MOJOSHADER_SYMTYPE_INT)
+        {
+            start *= 4;
+            if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
+            {
+                len *= 4;
+                if (param->value.element_count > 0)
+                    for (j = 0; j < sym->register_count; j++) /* <= element_count */
+                        memcpy(regi + start + (j * 4),
+                               ((uint32 *) data) + (j * param->value.row_count * param->value.column_count),
+                               len / param->value.element_count);
+                else
+                    memcpy(regi + start, data, len);
+            } // if
+            else
+                for (j = 0; j < len; j++)
+                    regf[start + j] = (float) ((uint32 *) data)[j];
+        } // else if
+        else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL)
+        {
+            /* register_count <= len */
+            if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
+                for (j = 0; j < sym->register_count; j++)
+                    regf[(start + j) * 4] = (float) ((uint32 *) data)[j];
+            else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
+                for (j = 0; j < sym->register_count; j++)
+                    regi[(start + j) * 4] = ((uint32 *) data)[j];
+            else
+                for (j = 0; j < sym->register_count; j++)
+                    regb[start + j] = ((uint32 *) data)[j];
+        } // else if
+    } // for
+} // copy_parameter_data
+
+
+void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
+{
+    MOJOSHADER_effectShader *rawVert = glEffect->current_vert_raw;
+    MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
+
+    /* Used for shader selection from preshaders */
+    int i;
+    MOJOSHADER_effectParam *param;
+    float selector;
+    int shader_object;
+    int selector_ran = 0;
 
     /* For effect passes with arrays of shaders, we have to run a preshader
      * that determines which shader to use, based on a parameter's value.
@@ -2828,17 +2907,14 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     #define SELECT_SHADER_FROM_PRESHADER(raw, gls) \
         if (raw != NULL && raw->is_preshader) \
         { \
-            preshader = raw->preshader; \
-            for (i = 0; i < preshader->symbol_count; i++) \
+            for (i = 0; i < raw->preshader->symbol_count; i++) \
             { \
-                sym = &preshader->symbols[i]; \
                 param = &glEffect->effect->params[raw->preshader_params[i]]; \
-                start = sym->register_index; \
-                data = param->value.values; \
-                len = param->value.value_count * 4; \
-                memcpy(preshader->registers + start, data, len); \
+                memcpy(raw->preshader->registers + raw->preshader->symbols[i].register_index, \
+                       param->value.values, \
+                       param->value.value_count * 4); \
             } \
-            MOJOSHADER_runPreshader(preshader, &selector); \
+            MOJOSHADER_runPreshader(raw->preshader, &selector); \
             shader_object = glEffect->effect->params[raw->params[0]].value.valuesI[(int) selector]; \
             raw = &glEffect->effect->objects[shader_object].shader; \
             for (i = 0; i < glEffect->num_shaders; i++) \
@@ -2870,128 +2946,37 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
         } // if
     } // if
 
+    /* This is where parameters are copied into the constant buffers.
+     * If you're looking for where things slow down immensely, look at
+     * the copy_parameter_data() and MOJOSHADER_runPreshader() functions.
+     * -flibit
+     */
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
-    #define COPY_PARAMETER_DATA(raw, regb, regi, regf) \
-        if (raw != NULL) \
+    // !!! FIXME: We're just running the preshaders every time. Blech. -flibit
+    // !!! FIXME: Will the preshader ever want int/bool registers? -flibit
+    #define COPY_PARAMETER_DATA(raw, regf, regi, regb) \
+    if (raw != NULL) \
+    { \
+        memset(ctx->regf, '\0', sizeof(ctx->regf)); \
+        memset(ctx->regi, '\0', sizeof(ctx->regi)); \
+        memset(ctx->regb, '\0', sizeof(ctx->regb)); \
+        copy_parameter_data(glEffect->effect->params, raw->params, \
+                            raw->shader->symbols, raw->shader->symbol_count, \
+                            ctx->regf, ctx->regi, ctx->regb); \
+        if (raw->shader->preshader) \
         { \
-            memset(ctx->regf, '\0', sizeof(ctx->regf)); \
-            memset(ctx->regi, '\0', sizeof(ctx->regi)); \
-            memset(ctx->regb, '\0', sizeof(ctx->regb)); \
-            for (i = 0; i < raw->shader->symbol_count; i++) \
-            { \
-                sym = &raw->shader->symbols[i]; \
-                param = &glEffect->effect->params[raw->params[i]]; \
-                start = sym->register_index; \
-                data = param->value.values; \
-                len = param->value.value_count; \
-                if (param->value.value_type == MOJOSHADER_SYMTYPE_FLOAT) \
-                { \
-                    start *= 4; \
-                    len *= 4; \
-                    if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
-                    { \
-                        elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
-                        len = sym->register_count / elements; \
-                        for (j = 0; j < elements; j++) \
-                        { \
-                            dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count); \
-                            for (r = 0; r < len; r++) /* <= row_count */ \
-                            { \
-                                regRow = ctx->regf + start + (j * 4 * param->value.row_count) + (r * 4); \
-                                for (c = 0; c < param->value.column_count; c++) \
-                                    regRow[c] = dataCol[r + (c * param->value.row_count)]; \
-                            } \
-                        } \
-                    } \
-                    else if (param->value.element_count > 0) \
-                        for (j = 0; j < sym->register_count; j++) /* <= element_count */ \
-                            memcpy(ctx->regf + start + (j * 4), \
-                                   ((float *) data) + (j * param->value.row_count * param->value.column_count), \
-                                   len / param->value.element_count); \
-                    else \
-                        memcpy(ctx->regf + start, data, len); \
-                } \
-                else if (param->value.value_type == MOJOSHADER_SYMTYPE_INT) \
-                { \
-                    start *= 4; \
-                    if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                    { \
-                        len *= 4; \
-                        if (param->value.element_count > 0) \
-                            for (j = 0; j < sym->register_count; j++) /* <= element_count */ \
-                                memcpy(ctx->regi + start + (j * 4), \
-                                       ((uint32 *) data) + (j * param->value.row_count * param->value.column_count), \
-                                       len / param->value.element_count); \
-                        else \
-                            memcpy(ctx->regi + start, data, len); \
-                    } \
-                    else \
-                        for (j = 0; j < len; j++) \
-                            ctx->regf[start + j] = (float) ((uint32 *) data)[j]; \
-                } \
-                else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL) \
-                { \
-                    /* register_count <= len */ \
-                    if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4) \
-                        for (j = 0; j < sym->register_count; j++) \
-                            ctx->regf[(start + j) * 4] = (float) ((uint32 *) data)[j]; \
-                    else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4) \
-                        for (j = 0; j < sym->register_count; j++) \
-                            ctx->regi[(start + j) * 4] = ((uint32 *) data)[j]; \
-                    else \
-                        for (j = 0; j < sym->register_count; j++) \
-                            ctx->regb[start + j] = ((uint32 *) data)[j]; \
-                } \
-            } \
-        }
-    COPY_PARAMETER_DATA(rawVert, vs_reg_file_b, vs_reg_file_i, vs_reg_file_f);
-    COPY_PARAMETER_DATA(rawFrag, ps_reg_file_b, ps_reg_file_i, ps_reg_file_f);
+            copy_parameter_data(glEffect->effect->params, raw->preshader_params, \
+                                raw->shader->preshader->symbols, \
+                                raw->shader->preshader->symbol_count, \
+                                raw->shader->preshader->registers, \
+                                NULL, \
+                                NULL); \
+            MOJOSHADER_runPreshader(raw->shader->preshader, ctx->regf); \
+        } \
+    }
+    COPY_PARAMETER_DATA(rawVert, vs_reg_file_f, vs_reg_file_i, vs_reg_file_b)
+    COPY_PARAMETER_DATA(rawFrag, ps_reg_file_f, ps_reg_file_i, ps_reg_file_b)
     #undef COPY_PARAMETER_DATA
-
-    // !!! FIXME: We're just running the preshader every time. Blech. -flibit
-    #define COPY_PRESHADER_PARAMETER_DATA(raw, reg_file_f) \
-        if (raw != NULL) \
-        { \
-            preshader = raw->shader->preshader; \
-            if (preshader) \
-            { \
-                for (i = 0; i < preshader->symbol_count; i++) \
-                { \
-                    sym = &preshader->symbols[i]; \
-                    param = &glEffect->effect->params[raw->preshader_params[i]]; \
-                    start = sym->register_index * 4; \
-                    data = param->value.values; \
-                    len = param->value.value_count; \
-                    if (param->value.value_type == MOJOSHADER_SYMTYPE_FLOAT) \
-                    { \
-                        if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS) \
-                        { \
-                            elements = (param->value.element_count < 1) ? 1 : param->value.element_count; \
-                            len = sym->register_count / elements; \
-                            for (j = 0; j < elements; j++) \
-                            { \
-                                dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count); \
-                                for (r = 0; r < len; r++) /* <= row_count */ \
-                                { \
-                                    regRow = preshader->registers + start + (j * 4 * param->value.row_count) + (r * 4); \
-                                    for (c = 0; c < param->value.column_count; c++) \
-                                        regRow[c] = dataCol[r + (c * param->value.row_count)]; \
-                                } \
-                            } \
-                        } \
-                        else \
-                            memcpy(preshader->registers + start, data, len * 4); \
-                    } \
-                    else \
-                        for (j = 0; j < len; j++) \
-                            preshader->registers[start + j] = (float) ((uint32 *) data)[j]; \
-                } \
-                MOJOSHADER_runPreshader(preshader, ctx->reg_file_f); \
-            } \
-        }
-    COPY_PRESHADER_PARAMETER_DATA(rawVert, vs_reg_file_f);
-    COPY_PRESHADER_PARAMETER_DATA(rawFrag, ps_reg_file_f);
-    #undef COPY_PRESHADER_PARAMETER_DATA
 
     ctx->generation++;
 } // MOJOSHADER_glEffectCommitChanges
