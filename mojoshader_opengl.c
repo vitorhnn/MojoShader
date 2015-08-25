@@ -2958,25 +2958,25 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     // !!! FIXME: We're just running the preshaders every time. Blech. -flibit
     // !!! FIXME: Will the preshader ever want int/bool registers? -flibit
     #define COPY_PARAMETER_DATA(raw, regf, regi, regb) \
-    if (raw != NULL) \
-    { \
-        memset(ctx->regf, '\0', sizeof(ctx->regf)); \
-        memset(ctx->regi, '\0', sizeof(ctx->regi)); \
-        memset(ctx->regb, '\0', sizeof(ctx->regb)); \
-        copy_parameter_data(glEffect->effect->params, raw->params, \
-                            raw->shader->symbols, raw->shader->symbol_count, \
-                            ctx->regf, ctx->regi, ctx->regb); \
-        if (raw->shader->preshader) \
+        if (raw != NULL) \
         { \
-            copy_parameter_data(glEffect->effect->params, raw->preshader_params, \
-                                raw->shader->preshader->symbols, \
-                                raw->shader->preshader->symbol_count, \
-                                raw->shader->preshader->registers, \
-                                NULL, \
-                                NULL); \
-            MOJOSHADER_runPreshader(raw->shader->preshader, ctx->regf); \
-        } \
-    }
+            memset(ctx->regf, '\0', sizeof(ctx->regf)); \
+            memset(ctx->regi, '\0', sizeof(ctx->regi)); \
+            memset(ctx->regb, '\0', sizeof(ctx->regb)); \
+            copy_parameter_data(glEffect->effect->params, raw->params, \
+                                raw->shader->symbols, raw->shader->symbol_count, \
+                                ctx->regf, ctx->regi, ctx->regb); \
+            if (raw->shader->preshader) \
+            { \
+                copy_parameter_data(glEffect->effect->params, raw->preshader_params, \
+                                    raw->shader->preshader->symbols, \
+                                    raw->shader->preshader->symbol_count, \
+                                    raw->shader->preshader->registers, \
+                                    NULL, \
+                                    NULL); \
+                MOJOSHADER_runPreshader(raw->shader->preshader, ctx->regf); \
+            } \
+        }
     COPY_PARAMETER_DATA(rawVert, vs_reg_file_f, vs_reg_file_i, vs_reg_file_b)
     COPY_PARAMETER_DATA(rawFrag, ps_reg_file_f, ps_reg_file_i, ps_reg_file_b)
     #undef COPY_PARAMETER_DATA
