@@ -2807,82 +2807,81 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
 {
     int i, j;
     MOJOSHADER_symbol *sym;
-    MOJOSHADER_effectParam *param;
-    void *data;
+    MOJOSHADER_effectValue *param;
     uint32 start;
-    uint32 len;
+    void *data;
+    void *dest;
 
-    /* FIXME: Extra vars just for row-major matrix copies. Ugh. */
+    /* FIXME: Extra vars just for uglier copies. Ugh. */
     int r, c;
     int elements;
+    uint32 len;
     float *regRow;
     float *dataCol;
 
     for (i = 0; i < symbol_count; i++)
     {
         sym = &symbols[i];
-        param = &params[param_loc[i]];
+        if (sym->register_set == MOJOSHADER_SYMREGSET_SAMPLER)
+            continue;
+
         start = sym->register_index;
-        data = param->value.values;
-        len = param->value.value_count;
-        if (param->value.value_type == MOJOSHADER_SYMTYPE_FLOAT)
+        param = &params[param_loc[i]].value;
+        data = param->values;
+
+        // float/int registers are vec4, so they have 4 elements each
+        start <<= 2;
+
+        // Matrices have to be transposed from row-major to column-major!
+        if (param->value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS)
         {
-            start *= 4;
-            len *= 4;
-            if (param->value.value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS)
+            // !!! FIXME: Only float matrices are supported! -flibit
+            assert(param->value_type == MOJOSHADER_SYMTYPE_FLOAT);
+
+            elements = (param->element_count < 1) ? 1 : param->element_count;
+            len = sym->register_count / elements; /* <= row_count */
+            for (j = 0; j < elements; j++)
             {
-                elements = (param->value.element_count < 1) ? 1 : param->value.element_count;
-                len = sym->register_count / elements;
-                for (j = 0; j < elements; j++)
-                {
-                    dataCol = ((float *) data) + (j * param->value.row_count * param->value.column_count);
-                    for (r = 0; r < len; r++) /* <= row_count */
-                    {
-                        regRow = regf + start + (j * 4 * param->value.row_count) + (r * 4);
-                        for (c = 0; c < param->value.column_count; c++)
-                            regRow[c] = dataCol[r + (c * param->value.row_count)];
-                    } // for
-                } // for
-            } // if
-            else if (param->value.element_count > 0)
-                for (j = 0; j < sym->register_count; j++) /* <= element_count */
-                    memcpy(regf + start + (j * 4),
-                           ((float *) data) + (j * param->value.row_count * param->value.column_count),
-                           len / param->value.element_count);
-            else
-                memcpy(regf + start, data, len);
+                dataCol = ((float *) data) + (j * param->row_count * param->column_count);
+                regRow = regf + start + ((j * param->row_count) << 2);
+                for (r = 0; r < len; r++, regRow += 4)
+                    for (c = 0; c < param->column_count; c++)
+                        regRow[c] = dataCol[r + (c * param->row_count)];
+            } // for
+            continue;
         } // if
-        else if (param->value.value_type == MOJOSHADER_SYMTYPE_INT)
+
+        if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
         {
-            start *= 4;
-            if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
+            // Sometimes int/bool parameters get thrown into float registers...
+            if (param->value_type != MOJOSHADER_SYMTYPE_FLOAT)
             {
-                len *= 4;
-                if (param->value.element_count > 0)
-                    for (j = 0; j < sym->register_count; j++) /* <= element_count */
-                        memcpy(regi + start + (j * 4),
-                               ((uint32 *) data) + (j * param->value.row_count * param->value.column_count),
-                               len / param->value.element_count);
-                else
-                    memcpy(regi + start, data, len);
-            } // if
-            else
-                for (j = 0; j < len; j++)
-                    regf[start + j] = (float) ((uint32 *) data)[j];
-        } // else if
-        else if (param->value.value_type == MOJOSHADER_SYMTYPE_BOOL)
+                regRow = regf + start;
+                for (j = 0; j < sym->register_count; j++, regRow += 4)
+                {
+                    for (c = 0; c < param->column_count; c++)
+                        regRow[c] = (float) ((uint32 *) data)[c];
+                    data += param->column_count << 2;
+                } // for
+                continue;
+            }
+            dest = regf + start;
+        }
+        else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
+            dest = regi + start;
+        else // Should be SYMREGSET_BOOL with SYMTYPE_BOOL!
         {
-            /* register_count <= len */
-            if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
-                for (j = 0; j < sym->register_count; j++)
-                    regf[(start + j) * 4] = (float) ((uint32 *) data)[j];
-            else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
-                for (j = 0; j < sym->register_count; j++)
-                    regi[(start + j) * 4] = ((uint32 *) data)[j];
-            else
-                for (j = 0; j < sym->register_count; j++)
-                    regb[start + j] = ((uint32 *) data)[j];
-        } // else if
+            start >>= 2; // welp -flibit
+            for (j = 0; j < sym->register_count; j++)
+                regb[start + j] = ((uint32 *) data)[j];
+            continue;
+        } // else
+
+        // Oh, look, it's a _simple_ copy!
+        for (j = 0; j < sym->register_count; j++, dest += 16)
+            memcpy(dest,
+                   data + ((j * param->column_count) << 2),
+                   param->column_count << 2);
     } // for
 } // copy_parameter_data
 
