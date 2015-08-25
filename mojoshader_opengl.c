@@ -2867,10 +2867,10 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                     data += param->column_count;
                 } // for
                 continue;
-            }
+            } // if
             // !!! FIXME: uint32* is arbitary, for Win32 -flibit
             dest = (uint32 *) regf + start;
-        }
+        } // if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
             // !!! FIXME: uint32* is arbitary, for Win32 -flibit
             dest = (uint32 *) regi + start;
