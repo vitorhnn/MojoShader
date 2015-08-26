@@ -2831,7 +2831,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             {
                 elements = (param->element_count < 1) ? 1 : param->element_count;
                 len = sym->register_count / elements; /* <= row_count */
-                dataCol = (float *) param->values;
+                dataCol = param->valuesF;
                 regRow = regf + start;
                 for (j = 0; j < elements; j++,
                      dataCol += j * param->row_count * param->column_count)
@@ -2842,10 +2842,10 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             else if (sym->register_count > 1)
                 for (j = 0; j < sym->register_count; j++)
                     memcpy(regf + start + (j << 2),
-                           ((float *) param->values) + (j * param->column_count),
+                           param->valuesF + (j * param->column_count),
                            param->column_count << 2);
             else
-                memcpy(regf + start, param->values, param->column_count << 2);
+                memcpy(regf + start, param->valuesF, param->column_count << 2);
         } // if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
         {
