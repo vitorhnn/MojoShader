@@ -2854,7 +2854,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             for (j = 0; j < sym->register_count; j++, regRow += 4)
                 for (c = 0; c < param->column_count; c++)
                     regRow[c] = (float) ((uint32 *) param->values)[(j * param->column_count) + c];
-        } // if
+        } // else if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
         {
             if (sym->register_count > 1)
