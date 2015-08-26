@@ -7,9 +7,6 @@
  *  This file written by Ryan C. Gordon.
  */
 
-// !!! FIXME: preshaders shouldn't be handled in here at all. This should
-// !!! FIXME:  be in the Effects API, once that's actually written.
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
