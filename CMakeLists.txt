@@ -32,7 +32,6 @@ ENDIF()
 # Defines
 ADD_DEFINITIONS(
 	-DMOJOSHADER_NO_VERSION_INCLUDE
-	-DMOJOSHADER_NO_VSNPRINTF
 	-DMOJOSHADER_EFFECT_SUPPORT
 	-DMOJOSHADER_FLIP_RENDERTARGET
 	-DMOJOSHADER_DEPTH_CLIPPING
@@ -45,7 +44,6 @@ SET(MOJOSHADER_SRC
 	mojoshader_common.c
 	mojoshader_opengl.c
 	mojoshader_effects.c
-	SDL_string.c
 )
 
 # Win32 /TP, note that we're omitting SDL_string.c!

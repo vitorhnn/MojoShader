@@ -446,7 +446,7 @@ static inline void output_blank_line(Context *ctx)
 static void floatstr(Context *ctx, char *buf, size_t bufsize, float f,
                      int leavedecimal)
 {
-    const size_t len = snprintf(buf, bufsize, "%f", f);
+    const size_t len = MOJOSHADER_printFloat(buf, bufsize, f);
     if ((len+2) >= bufsize)
         fail(ctx, "BUG: internal buffer is too small");
     else

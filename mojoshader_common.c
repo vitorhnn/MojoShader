@@ -1011,5 +1011,72 @@ ssize_t buffer_find(Buffer *buffer, const size_t start,
     return -1;  // no match found.
 } // buffer_find
 
+
+// Based on SDL_string.c's SDL_PrintFloat function
+size_t MOJOSHADER_printFloat(char *text, size_t maxlen, float arg)
+{
+    size_t len;
+    size_t left = maxlen;
+    char *textstart = text;
+
+    int precision = 6;
+
+    if (arg)
+    {
+        /* This isn't especially accurate, but hey, it's easy. :) */
+        unsigned long value;
+
+        if (arg < 0)
+        {
+            if (left > 1)
+            {
+                *text = '-';
+                --left;
+            } // if
+            ++text;
+            arg = -arg;
+        } // if
+        value = (unsigned long) arg;
+        len = snprintf(text, left, "%lu", value);
+        text += len;
+        if (len >= left)
+            left = (left < 1) ? left : 1;
+        else
+            left -= len;
+        arg -= value;
+
+        int mult = 10;
+        if (left > 1)
+        {
+            *text = '.';
+            --left;
+        } // if
+        ++text;
+        while (precision-- > 0)
+        {
+            value = (unsigned long) (arg * mult);
+            len = snprintf(text, left, "%lu", value);
+            text += len;
+            if (len >= left)
+                left = (left < 1) ? left : 1;
+            else
+                left -= len;
+            arg -= (double) value / mult;
+            mult *= 10;
+        } // while
+    } // if
+    else
+    {
+        if (left > 3)
+        {
+            snprintf(text, left, "0.0");
+            left -= 3;
+        } // if
+        text += 3;
+    } // else
+
+    return (text - textstart);
+} // MOJOSHADER_printFloat
+
 // end of mojoshader_common.c ...
 

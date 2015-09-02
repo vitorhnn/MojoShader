@@ -91,19 +91,14 @@ void MOJOSHADER_runPreshader(const MOJOSHADER_preshader*, float*);
 
 typedef unsigned int uint;  // this is a printf() helper. don't use for code.
 
-#ifdef MOJOSHADER_NO_VSNPRINTF
-#include "SDL_stdinc.h" // !!! FIXME: Replace with real functions -flibit
-#define snprintf MOJOSHADER_internal_snprintf
-#define vsnprintf MOJOSHADER_internal_vsnprintf
-#endif
+// Locale-independent float printing replacement for snprintf
+size_t MOJOSHADER_printFloat(char *text, size_t maxlen, float arg);
 
 #ifdef _MSC_VER
 #include <malloc.h>
 #define va_copy(a, b) a = b
-#ifndef MOJOSHADER_NO_VSNPRINTF
 #define snprintf _snprintf  // !!! FIXME: not a safe replacement!
 #define vsnprintf _vsnprintf  // !!! FIXME: not a safe replacement!
-#endif
 #define strcasecmp stricmp
 #define strncasecmp strnicmp
 typedef unsigned __int8 uint8;
