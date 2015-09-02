@@ -48,13 +48,7 @@ SET(MOJOSHADER_SRC
 
 # Win32 /TP, note that we're omitting SDL_string.c!
 IF(WIN32)
-	SET_SOURCE_FILES_PROPERTIES(
-		mojoshader.c
-		mojoshader_common.c
-		mojoshader_opengl.c
-		mojoshader_effects.c
-		PROPERTIES LANGUAGE CXX
-	)
+	SET_SOURCE_FILES_PROPERTIES(${MOJOSHADER_SRC} PROPERTIES LANGUAGE CXX)
 ENDIF()
 
 # Targets
