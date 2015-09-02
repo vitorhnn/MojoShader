@@ -791,13 +791,6 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_freePreshader(const MOJOSHADER_preshader *pr
 
 
 /* Effects interface... */
-
-/* FIXME: Make this a configurable define.
- * The Effects API is a big, fat blob of _stuff_, so we should make this
- * optional for those who don't need this entire subsystem in their build.
- * -flibit
- */
-#define MOJOSHADER_EFFECT_SUPPORT
 #include "mojoshader_effects.h"
 
 
@@ -3101,15 +3094,10 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glSetVertexAttribDivisor(MOJOSHADER_usage us
  */
 MOJOSHADER_EXPORTFN void MOJOSHADER_glProgramReady(void);
 
-/* FIXME: Make this a configurable define.
- * Basically, you shouldn't use this unless you're screwed like FNA is and
- * have to hack in a way to flip the y axis without actually changing anything.
- * -flibit
- */
-#define MOJOSHADER_FLIP_RENDERTARGET
-#define MOJOSHADER_DEPTH_CLIPPING
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
 // !!! FIXME: Document me.
 MOJOSHADER_EXPORTFN void MOJOSHADER_glProgramViewportFlip(int flip);
+#endif
 
 /*
  * Free the resources of a linked program. This will delete the GL object
