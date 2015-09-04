@@ -2823,6 +2823,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             {
                 if (param->element_count > 1)
                 {
+                    const uint32 regcount = sym->register_count / param->element_count;
                     j = 0;
                     do
                     {
@@ -2832,11 +2833,15 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                             c = 0;
                             do
                             {
-                                regf[start + (r << 2) + c] = param->valuesF[r +
-                                                                           (c * param->row_count) +
-                                                                           (j * param->row_count * param->column_count)];
+                                const uint32 dest = start + c +
+                                                   (r << 2) +
+                                                  ((j << 2) * regcount);
+                                const uint32 src = r +
+                                                  (c * param->row_count) +
+                                                  (j * param->row_count * param->column_count);
+                                regf[dest] = param->valuesF[src];
                             } while (++c < param->column_count);
-                        } while (++r < sym->register_count / param->element_count);
+                        } while (++r < regcount);
                     } while (++j < param->element_count);
                 } // if
                 else
