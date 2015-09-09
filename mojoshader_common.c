@@ -1019,7 +1019,7 @@ size_t MOJOSHADER_printFloat(char *text, size_t maxlen, float arg)
     size_t left = maxlen;
     char *textstart = text;
 
-    int precision = 6;
+    int precision = 9;
 
     if (arg)
     {
