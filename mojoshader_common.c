@@ -1055,6 +1055,8 @@ size_t MOJOSHADER_printFloat(char *text, size_t maxlen, float arg)
         while (precision-- > 0)
         {
             value = (unsigned long) (arg * mult);
+            if (value >= 10)
+                break; // We've entered Floating Point Crazy Town, bail -flibit
             len = snprintf(text, left, "%lu", value);
             text += len;
             if (len >= left)
