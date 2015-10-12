@@ -1139,7 +1139,7 @@ MOJOSHADER_preshader *copypreshader(const MOJOSHADER_preshader *src,
                                     MOJOSHADER_malloc m,
                                     void *d)
 {
-    int i;
+    int i, j;
     uint32 siz;
     MOJOSHADER_preshader *retval;
 
@@ -1169,6 +1169,16 @@ MOJOSHADER_preshader *copypreshader(const MOJOSHADER_preshader *src,
     retval->instructions = (MOJOSHADER_preshaderInstruction *) m(siz, d);
     // !!! FIXME: Out of memory check!
     memcpy(retval->instructions, src->instructions, siz);
+    for (i = 0; i < retval->instruction_count; i++)
+        for (j = 0; j < retval->instructions[i].operand_count; j++)
+        {
+            siz = sizeof (unsigned int) * retval->instructions[i].operands[j].array_register_count;
+            retval->instructions[i].operands[j].array_registers = m(siz, d);
+            // !!! FIXME: Out of memory check!
+            memcpy(retval->instructions[i].operands[j].array_registers,
+                   src->instructions[i].operands[j].array_registers,
+                   siz);
+        } // for
 
     siz = sizeof (float) * 4 * src->register_count;
     retval->register_count = src->register_count;
