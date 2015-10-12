@@ -111,6 +111,7 @@ struct MOJOSHADER_glProgram
     GLint ps_bool_loc;
 #ifdef MOJOSHADER_FLIP_RENDERTARGET
     GLint vs_flip_loc;
+    int current_flip;
 #endif
 };
 
@@ -2390,6 +2391,7 @@ void MOJOSHADER_glProgramReady(void)
         GLfloat *dstf = program->vs_uniforms_float4;
         GLint *dsti = program->vs_uniforms_int4;
         GLint *dstb = program->vs_uniforms_bool;
+        uint8 uniforms_changed = 0;
         uint32 i;
 
         for (i = 0; i < count; i++)
@@ -2431,14 +2433,22 @@ void MOJOSHADER_glProgramReady(void)
             {
                 const size_t count = 4 * size;
                 const GLfloat *f = &srcf[index * 4];
-                memcpy(dstf, f, sizeof (GLfloat) * count);
+                if (memcmp(dstf, f, sizeof (GLfloat) * count) != 0)
+                {
+                    memcpy(dstf, f, sizeof (GLfloat) * count);
+                    uniforms_changed = 1;
+                }
                 dstf += count;
             } // if
             else if (type == MOJOSHADER_UNIFORM_INT)
             {
                 const size_t count = 4 * size;
                 const GLint *i = &srci[index * 4];
-                memcpy(dsti, i, sizeof (GLint) * count);
+                if (memcmp(dsti, i, sizeof (GLint) * count) != 0)
+                {
+                    memcpy(dsti, i, sizeof (GLint) * count);
+                    uniforms_changed = 1;
+                } // if
                 dsti += count;
             } // else if
             else if (type == MOJOSHADER_UNIFORM_BOOL)
@@ -2447,7 +2457,11 @@ void MOJOSHADER_glProgramReady(void)
                 const uint8 *b = &srcb[index];
                 size_t i;
                 for (i = 0; i < count; i++)
-                    dstb[i] = (GLint) b[i];
+                    if (dstb[i] != b[i])
+                    {
+                        dstb[i] = (GLint) b[i];
+                        uniforms_changed = 1;
+                    } // if
                 dstb += count;
             } // else if
 
@@ -2487,7 +2501,8 @@ void MOJOSHADER_glProgramReady(void)
 
         program->generation = ctx->generation;
 
-        ctx->profilePushUniforms();
+        if (uniforms_changed)
+            ctx->profilePushUniforms();
     } // if
 } // MOJOSHADER_glProgramReady
 
@@ -2541,13 +2556,18 @@ void MOJOSHADER_glDestroyContext(MOJOSHADER_glContext *_ctx)
 
 void MOJOSHADER_glProgramViewportFlip(int flip)
 {
+    assert(ctx->bound_program->vs_flip_loc != -1);
+
     /* Some compilers require that vpFlip be a float value, rather than int.
      * However, there's no real reason for it to be a float in the API, so we
      * do a cast in here. That's not so bad, right...?
      * -flibit
      */
-    if (ctx->bound_program->vs_flip_loc != -1)
+    if (flip != ctx->bound_program->current_flip)
+    {
         ctx->glUniform1f(ctx->bound_program->vs_flip_loc, (float) flip);
+        ctx->bound_program->current_flip = flip;
+    } // if
 }
 
 
