@@ -1173,7 +1173,7 @@ MOJOSHADER_preshader *copypreshader(const MOJOSHADER_preshader *src,
         for (j = 0; j < retval->instructions[i].operand_count; j++)
         {
             siz = sizeof (unsigned int) * retval->instructions[i].operands[j].array_register_count;
-            retval->instructions[i].operands[j].array_registers = m(siz, d);
+            retval->instructions[i].operands[j].array_registers = (unsigned int *) m(siz, d);
             // !!! FIXME: Out of memory check!
             memcpy(retval->instructions[i].operands[j].array_registers,
                    src->instructions[i].operands[j].array_registers,
