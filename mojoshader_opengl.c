@@ -2145,7 +2145,7 @@ void MOJOSHADER_glGetVertexShaderUniformI(unsigned int idx, int *data,
 void MOJOSHADER_glSetVertexShaderUniformB(unsigned int idx, const int *data,
                                           unsigned int bcount)
 {
-    const uint maxregs = STATICARRAYLEN(ctx->vs_reg_file_f) / 4;
+    const uint maxregs = STATICARRAYLEN(ctx->vs_reg_file_b) / 4;
     if (idx < maxregs)
     {
         uint8 *wptr = ctx->vs_reg_file_b + idx;
@@ -2160,7 +2160,7 @@ void MOJOSHADER_glSetVertexShaderUniformB(unsigned int idx, const int *data,
 void MOJOSHADER_glGetVertexShaderUniformB(unsigned int idx, int *data,
                                           unsigned int bcount)
 {
-    const uint maxregs = STATICARRAYLEN(ctx->vs_reg_file_f) / 4;
+    const uint maxregs = STATICARRAYLEN(ctx->vs_reg_file_b) / 4;
     if (idx < maxregs)
     {
         uint8 *rptr = ctx->vs_reg_file_b + idx;
@@ -2228,7 +2228,7 @@ void MOJOSHADER_glGetPixelShaderUniformI(unsigned int idx, int *data,
 void MOJOSHADER_glSetPixelShaderUniformB(unsigned int idx, const int *data,
                                          unsigned int bcount)
 {
-    const uint maxregs = STATICARRAYLEN(ctx->ps_reg_file_f) / 4;
+    const uint maxregs = STATICARRAYLEN(ctx->ps_reg_file_b) / 4;
     if (idx < maxregs)
     {
         uint8 *wptr = ctx->ps_reg_file_b + idx;
@@ -2243,7 +2243,7 @@ void MOJOSHADER_glSetPixelShaderUniformB(unsigned int idx, const int *data,
 void MOJOSHADER_glGetPixelShaderUniformB(unsigned int idx, int *data,
                                          unsigned int bcount)
 {
-    const uint maxregs = STATICARRAYLEN(ctx->ps_reg_file_f) / 4;
+    const uint maxregs = STATICARRAYLEN(ctx->ps_reg_file_b) / 4;
     if (idx < maxregs)
     {
         uint8 *rptr = ctx->ps_reg_file_b + idx;
