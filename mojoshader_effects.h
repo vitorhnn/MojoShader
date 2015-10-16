@@ -326,7 +326,7 @@ typedef struct MOJOSHADER_effectValue
     {
          /* Raw value types */
         void                           *values;
-        unsigned int                   *valuesI;
+        int                            *valuesI;
         float                          *valuesF;
         /* As used by MOJOSHADER_effectState */
         MOJOSHADER_zBufferType         *valuesZBT;

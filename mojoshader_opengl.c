@@ -2899,7 +2899,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                 c = 0;
                 do
                 {
-                    regf[start + (j << 2) + c] = (float) ((uint32 *) param->values)[(j * param->column_count) + c];
+                    regf[start + (j << 2) + c] = (float) param->valuesI[(j * param->column_count) + c];
                 } while (++c < param->column_count);
             } while (++j < sym->register_count);
         } // else if
@@ -2911,12 +2911,12 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                 do
                 {
                     memcpy(regi + start + (j << 2),
-                           ((uint32 *) param->values) + (j * param->column_count),
+                           param->valuesI + (j * param->column_count),
                            param->column_count << 2);
                 } while (++j < sym->register_count);
             } // if
             else
-                memcpy(regi + start, param->values, param->column_count << 2);
+                memcpy(regi + start, param->valuesI, param->column_count << 2);
         } // else if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL)
         {
@@ -2924,7 +2924,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             do
             {
                 // regb is not a vec4, enjoy this bitshift! -flibit
-                regb[(start >> 2) + j] = ((uint32 *) param->values)[j];
+                regb[(start >> 2) + j] = param->valuesI[j];
             } while (++j < sym->register_count);
         } // else if
     } // for
