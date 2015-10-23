@@ -3000,18 +3000,21 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     // !!! FIXME: We're just copying everything every time. Blech. -flibit
     // !!! FIXME: We're just running the preshaders every time. Blech. -flibit
     // !!! FIXME: Will the preshader ever want int/bool registers? -flibit
-    #define COPY_PARAMETER_DATA(raw, regf, regi, regb, locf, loci, locb) \
+    #define COPY_PARAMETER_DATA(raw, stage) \
         if (raw != NULL) \
         { \
-            if (ctx->bound_program->locf != -1) \
-                memset(ctx->regf, '\0', sizeof(ctx->regf)); \
-            if (ctx->bound_program->loci != -1) \
-                memset(ctx->regi, '\0', sizeof(ctx->regi)); \
-            if (ctx->bound_program->locb != -1) \
-                memset(ctx->regb, '\0', sizeof(ctx->regb)); \
+            if (ctx->bound_program->stage##_float4_loc != -1) \
+                memset(ctx->stage##_reg_file_f, '\0', ctx->bound_program->stage##_uniforms_float4_count << 4); \
+            if (ctx->bound_program->stage##_int4_loc != -1) \
+                memset(ctx->stage##_reg_file_i, '\0', ctx->bound_program->stage##_uniforms_int4_count << 4); \
+            if (ctx->bound_program->stage##_bool_loc != -1) \
+                memset(ctx->stage##_reg_file_b, '\0', ctx->bound_program->stage##_uniforms_bool_count << 2); \
             copy_parameter_data(glEffect->effect->params, raw->params, \
-                                raw->shader->symbols, raw->shader->symbol_count, \
-                                ctx->regf, ctx->regi, ctx->regb); \
+                                raw->shader->symbols, \
+                                raw->shader->symbol_count, \
+                                ctx->stage##_reg_file_f, \
+                                ctx->stage##_reg_file_i, \
+                                ctx->stage##_reg_file_b); \
             if (raw->shader->preshader) \
             { \
                 copy_parameter_data(glEffect->effect->params, raw->preshader_params, \
@@ -3020,13 +3023,11 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                                     raw->shader->preshader->registers, \
                                     NULL, \
                                     NULL); \
-                MOJOSHADER_runPreshader(raw->shader->preshader, ctx->regf); \
+                MOJOSHADER_runPreshader(raw->shader->preshader, ctx->stage##_reg_file_f); \
             } \
         }
-    COPY_PARAMETER_DATA(rawVert, vs_reg_file_f, vs_reg_file_i, vs_reg_file_b,
-                                 vs_float4_loc, vs_int4_loc, vs_bool_loc)
-    COPY_PARAMETER_DATA(rawFrag, ps_reg_file_f, ps_reg_file_i, ps_reg_file_b,
-                                 ps_float4_loc, ps_int4_loc, ps_bool_loc)
+    COPY_PARAMETER_DATA(rawVert, vs)
+    COPY_PARAMETER_DATA(rawFrag, ps)
     #undef COPY_PARAMETER_DATA
 
     ctx->generation++;
