@@ -1347,11 +1347,13 @@ int MOJOSHADER_glAvailableProfiles(MOJOSHADER_glGetProcAddress lookup,
 
     load_extensions(lookup, lookup_d);
 
+#if SUPPORT_PROFILE_GLSLES
     if (ctx->have_opengl_es)
     {
         profs[0] = MOJOSHADER_PROFILE_GLSLES;
         return 1;
     } // if
+#endif
 
     if (ctx->have_core_opengl)
     {
