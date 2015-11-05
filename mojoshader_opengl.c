@@ -185,6 +185,7 @@ struct MOJOSHADER_glContext
     int have_core_opengl;
     int have_opengl_2;  // different entry points than ARB extensions.
     int have_opengl_3;  // different extension query.
+    int have_opengl_es; // different extension requirements
     int have_GL_ARB_vertex_program;
     int have_GL_ARB_fragment_program;
     int have_GL_NV_vertex_program2_option;
@@ -1073,6 +1074,8 @@ static void detect_glsl_version(void)
         const char *str = (const char *) ctx->glGetString(enumval);
         if (ctx->glGetError() == GL_INVALID_ENUM)
             str = NULL;
+        if (strstr(str, "OpenGL ES GLSL ES "))
+            str += 18;
         parse_opengl_version_str(str, &ctx->glsl_major, &ctx->glsl_minor);
     } // if
 #endif
@@ -1123,6 +1126,11 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
     else
     {
         const char *str = (const char *) ctx->glGetString(GL_VERSION);
+        if (strstr(str, "OpenGL ES "))
+        {
+            ctx->have_opengl_es = 1;
+            str += 10;
+        }
         parse_opengl_version_str(str, &ctx->opengl_major, &ctx->opengl_minor);
 
         if ((ctx->have_opengl_3) && (opengl_version_atleast(3, 0)))
@@ -1268,6 +1276,13 @@ static int valid_profile(const char *profile)
     } // else if
     #endif
 
+    #if SUPPORT_PROFILE_GLSLES
+    else if (strcmp(profile, MOJOSHADER_PROFILE_GLSLES) == 0)
+    {
+        MUST_HAVE_GLSL(MOJOSHADER_PROFILE_GLSLES, 1, 10);
+    } // else if
+    #endif
+
     #if SUPPORT_PROFILE_GLSL120
     else if (strcmp(profile, MOJOSHADER_PROFILE_GLSL120) == 0)
     {
@@ -1331,6 +1346,12 @@ int MOJOSHADER_glAvailableProfiles(MOJOSHADER_glGetProcAddress lookup,
     ctx->malloc_data = malloc_d;
 
     load_extensions(lookup, lookup_d);
+
+    if (ctx->have_opengl_es)
+    {
+        profs[0] = MOJOSHADER_PROFILE_GLSLES;
+        return 1;
+    } // if
 
     if (ctx->have_core_opengl)
     {
@@ -1415,10 +1436,11 @@ MOJOSHADER_glContext *MOJOSHADER_glCreateContext(const char *profile,
     // !!! FIXME: generalize this part.
     if (profile == NULL) {}
 
-    // We don't check SUPPORT_PROFILE_GLSL120 here, since valid_profile() does.
+    // We don't check SUPPORT_PROFILE_GLSL120/ES here, since valid_profile() does.
 #if SUPPORT_PROFILE_GLSL
     else if ( (strcmp(profile, MOJOSHADER_PROFILE_GLSL) == 0) ||
-              (strcmp(profile, MOJOSHADER_PROFILE_GLSL120) == 0) )
+              (strcmp(profile, MOJOSHADER_PROFILE_GLSL120) == 0) ||
+              (strcmp(profile, MOJOSHADER_PROFILE_GLSLES) == 0) )
     {
         ctx->profileMaxUniforms = impl_GLSL_MaxUniforms;
         ctx->profileCompileShader = impl_GLSL_CompileShader;

@@ -178,6 +178,9 @@ typedef struct Context
 #if SUPPORT_PROFILE_GLSL120
     int profile_supports_glsl120;
 #endif
+#if SUPPORT_PROFILE_GLSLES
+    int profile_supports_glsles;
+#endif
 } Context;
 
 
@@ -196,6 +199,12 @@ typedef struct Context
 #define support_glsl120(ctx) ((ctx)->profile_supports_glsl120)
 #else
 #define support_glsl120(ctx) (0)
+#endif
+
+#if SUPPORT_PROFILE_GLSLES
+#define support_glsles(ctx) ((ctx)->profile_supports_glsles)
+#else
+#define support_glsles(ctx) (0)
 #endif
 
 
@@ -2185,6 +2194,20 @@ static void emit_GLSL_start(Context *ctx, const char *profilestr)
     } // else if
     #endif
 
+    #if SUPPORT_PROFILE_GLSLES
+    else if (strcmp(profilestr, MOJOSHADER_PROFILE_GLSLES) == 0)
+    {
+        ctx->profile_supports_glsles = 1;
+        push_output(ctx, &ctx->preflight);
+        output_line(ctx, "#version 110");
+        output_line(ctx, "precision mediump float;");
+        output_line(ctx, "varying vec4 v_FrontColor;");
+        output_line(ctx, "varying vec4 v_FrontSecondaryColor;");
+        output_line(ctx, "varying vec4 v_TexCoord[10];"); // 10 according to SM3
+        pop_output(ctx);
+    } // else if
+    #endif
+
     else
     {
         failf(ctx, "Profile '%s' unsupported or unknown.", profilestr);
@@ -2560,15 +2583,34 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                 case MOJOSHADER_USAGE_COLOR:
                     index_str[0] = '\0';  // no explicit number.
                     if (index == 0)
+                    {
+#if SUPPORT_PROFILE_GLSLES
+                        if (support_glsles(ctx))
+                            usage_str = "v_FrontColor";
+                        else
+#endif
                         usage_str = "gl_FrontColor";
+                    } // if
                     else if (index == 1)
+                    {
+#if SUPPORT_PROFILE_GLSLES
+                        if (support_glsles(ctx))
+                            usage_str = "v_FrontSecondaryColor";
+                        else
+#endif
                         usage_str = "gl_FrontSecondaryColor";
+                    } // else if
                     break;
                 case MOJOSHADER_USAGE_FOG:
                     usage_str = "gl_FogFragCoord";
                     break;
                 case MOJOSHADER_USAGE_TEXCOORD:
                     snprintf(index_str, sizeof (index_str), "%u", (uint) index);
+#if SUPPORT_PROFILE_GLSLES
+                    if (support_glsles(ctx))
+                        usage_str = "v_TexCoord";
+                    else
+#endif
                     usage_str = "gl_TexCoord";
                     arrayleft = "[";
                     arrayright = "]";
@@ -2634,6 +2676,11 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                 if (shader_version_atleast(ctx, 1, 4))
                 {
                     snprintf(index_str, sizeof (index_str), "%u", (uint) index);
+#if SUPPORT_PROFILE_GLSLES
+                    if (support_glsles(ctx))
+                        usage_str = "v_TexCoord";
+                    else
+#endif
                     usage_str = "gl_TexCoord";
                     arrayleft = "[";
                     arrayright = "]";
@@ -2644,9 +2691,23 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
             {
                 index_str[0] = '\0';  // no explicit number.
                 if (index == 0)
+                {
+#if SUPPORT_PROFILE_GLSLES
+                    if (support_glsles(ctx))
+                        usage_str = "v_FrontColor";
+                    else
+#endif
                     usage_str = "gl_Color";
+                } // if
                 else if (index == 1)
+                {
+#if SUPPORT_PROFILE_GLSLES
+                    if (support_glsles(ctx))
+                        usage_str = "v_FrontSecondaryColor";
+                    else
+#endif
                     usage_str = "gl_SecondaryColor";
+                } // else if
                 else
                     fail(ctx, "unsupported color index");
             } // else if
@@ -6187,6 +6248,7 @@ static const Profile profiles[] =
 // This is for profiles that extend other profiles...
 static const struct { const char *from; const char *to; } profileMap[] =
 {
+    { MOJOSHADER_PROFILE_GLSLES, MOJOSHADER_PROFILE_GLSL },
     { MOJOSHADER_PROFILE_GLSL120, MOJOSHADER_PROFILE_GLSL },
     { MOJOSHADER_PROFILE_NV2, MOJOSHADER_PROFILE_ARB1 },
     { MOJOSHADER_PROFILE_NV3, MOJOSHADER_PROFILE_ARB1 },
@@ -9613,6 +9675,7 @@ int MOJOSHADER_maxShaderModel(const char *profile)
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_BYTECODE, 3);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_GLSL, 3);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_GLSL120, 3);
+    PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_GLSLES, 3);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_ARB1, 2);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_NV2, 2);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_NV3, 2);

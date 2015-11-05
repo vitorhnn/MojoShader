@@ -671,6 +671,11 @@ typedef struct MOJOSHADER_parseData
 #define MOJOSHADER_PROFILE_GLSL120 "glsl120"
 
 /*
+ * Profile string for GLSL ES: minor changes to GLSL output for ES compliance.
+ */
+#define MOJOSHADER_PROFILE_GLSLES "glsles"
+
+/*
  * Profile string for OpenGL ARB 1.0 shaders: GL_ARB_(vertex|fragment)_program.
  */
 #define MOJOSHADER_PROFILE_ARB1 "arb1"

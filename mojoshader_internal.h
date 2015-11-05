@@ -52,6 +52,10 @@
 #define SUPPORT_PROFILE_GLSL120 1
 #endif
 
+#ifndef SUPPORT_PROFILE_GLSLES
+#define SUPPORT_PROFILE_GLSLES 1
+#endif
+
 #ifndef SUPPORT_PROFILE_ARB1
 #define SUPPORT_PROFILE_ARB1 1
 #endif
@@ -66,6 +70,10 @@
 
 #if SUPPORT_PROFILE_GLSL120 && !SUPPORT_PROFILE_GLSL
 #error glsl120 profile requires glsl profile. Fix your build.
+#endif
+
+#if SUPPORT_PROFILE_GLSLES && !SUPPORT_PROFILE_GLSL
+#error glsles profile requires glsl profile. Fix your build.
 #endif
 
 // Microsoft's preprocessor has some quirks. In some ways, it doesn't work
