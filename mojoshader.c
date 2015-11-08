@@ -2199,7 +2199,7 @@ static void emit_GLSL_start(Context *ctx, const char *profilestr)
     {
         ctx->profile_supports_glsles = 1;
         push_output(ctx, &ctx->preflight);
-        output_line(ctx, "#version 110");
+        output_line(ctx, "#version 100");
         output_line(ctx, "precision mediump float;");
         output_line(ctx, "varying vec4 v_FrontColor;");
         output_line(ctx, "varying vec4 v_FrontSecondaryColor;");
