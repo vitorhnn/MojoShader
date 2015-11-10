@@ -2200,7 +2200,11 @@ static void emit_GLSL_start(Context *ctx, const char *profilestr)
         ctx->profile_supports_glsles = 1;
         push_output(ctx, &ctx->preflight);
         output_line(ctx, "#version 100");
-        output_line(ctx, "precision mediump float;");
+        if (shader_is_vertex(ctx))
+            output_line(ctx, "precision highp float;");
+        else
+            output_line(ctx, "precision mediump float;");
+        output_line(ctx, "precision mediump int;");
         output_line(ctx, "varying vec4 v_FrontColor;");
         output_line(ctx, "varying vec4 v_FrontSecondaryColor;");
         output_line(ctx, "varying vec4 v_TexCoord[10];"); // 10 according to SM3
