@@ -580,24 +580,24 @@ typedef struct MOJOSHADER_effect
 /* Effect parsing interface... */
 
 /* !!! FIXME: document me. */
-MOJOSHADER_EXPORTFN MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
-                                                              const unsigned char *buf,
-                                                              const unsigned int _len,
-                                                              const MOJOSHADER_swizzle *swiz,
-                                                              const unsigned int swizcount,
-                                                              const MOJOSHADER_samplerMap *smap,
-                                                              const unsigned int smapcount,
-                                                              MOJOSHADER_malloc m,
-                                                              MOJOSHADER_free f,
-                                                              void *d);
+DECLSPEC MOJOSHADER_effect *MOJOSHADER_parseEffect(const char *profile,
+                                                   const unsigned char *buf,
+                                                   const unsigned int _len,
+                                                   const MOJOSHADER_swizzle *swiz,
+                                                   const unsigned int swizcount,
+                                                   const MOJOSHADER_samplerMap *smap,
+                                                   const unsigned int smapcount,
+                                                   MOJOSHADER_malloc m,
+                                                   MOJOSHADER_free f,
+                                                   void *d);
 
 
 /* !!! FIXME: document me. */
-MOJOSHADER_EXPORTFN void MOJOSHADER_freeEffect(const MOJOSHADER_effect *effect);
+DECLSPEC void MOJOSHADER_freeEffect(const MOJOSHADER_effect *effect);
 
 
 /* !!! FIXME: document me. */
-MOJOSHADER_EXPORTFN MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect);
+DECLSPEC MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_effect *effect);
 
 
 /* Effect parameter interface... */
@@ -613,10 +613,10 @@ MOJOSHADER_EXPORTFN MOJOSHADER_effect *MOJOSHADER_cloneEffect(const MOJOSHADER_e
  *
  * This function is thread safe.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_effectParam *parameter,
-                                                            const void *data,
-                                                            const unsigned int offset,
-                                                            const unsigned int len);
+DECLSPEC void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_effectParam *parameter,
+                                                 const void *data,
+                                                 const unsigned int offset,
+                                                 const unsigned int len);
 
 /* Set the constant value for the effect parameter, specified by name.
  *  Note: this function is slower than MOJOSHADER_effectSetRawValueHandle(),
@@ -632,11 +632,11 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_eff
  *
  * This function is thread safe.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
-                                                          const char *name,
-                                                          const void *data,
-                                                          const unsigned int offset,
-                                                          const unsigned int len);
+DECLSPEC void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
+                                               const char *name,
+                                               const void *data,
+                                               const unsigned int offset,
+                                               const unsigned int len);
 
 
 /* Effect technique interface... */
@@ -651,7 +651,7 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effec
  *
  * This function is thread safe.
  */
-MOJOSHADER_EXPORTFN const MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect);
+DECLSPEC const MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurrentTechnique(const MOJOSHADER_effect *effect);
 
 /* Set the current technique to be used an effect.
  *
@@ -662,8 +662,8 @@ MOJOSHADER_EXPORTFN const MOJOSHADER_effectTechnique *MOJOSHADER_effectGetCurren
  *
  * This function is thread safe.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
-                                                       const MOJOSHADER_effectTechnique *technique);
+DECLSPEC void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect,
+                                            const MOJOSHADER_effectTechnique *technique);
 
 /* Get the next technique in an effect's list.
  *
@@ -678,8 +678,8 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_effectSetTechnique(MOJOSHADER_effect *effect
  *
  * This function is thread safe.
  */
-MOJOSHADER_EXPORTFN const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
-                                                                                              const MOJOSHADER_effectTechnique *technique);
+DECLSPEC const MOJOSHADER_effectTechnique *MOJOSHADER_effectFindNextValidTechnique(const MOJOSHADER_effect *effect,
+                                                                                   const MOJOSHADER_effectTechnique *technique);
 
 
 /* OpenGL effect interface... */
@@ -703,7 +703,7 @@ typedef struct MOJOSHADER_glEffect MOJOSHADER_glEffect;
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect);
+DECLSPEC MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_effect *effect);
 
 /* Delete the shaders that were allocated for an effect.
  *
@@ -714,7 +714,7 @@ MOJOSHADER_EXPORTFN MOJOSHADER_glEffect *MOJOSHADER_glCompileEffect(MOJOSHADER_e
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect);
+DECLSPEC void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect);
 
 /* Prepare the effect for rendering with the currently applied technique.
  *
@@ -745,10 +745,10 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
-                                                  unsigned int *numPasses,
-                                                  int saveShaderState,
-                                                  MOJOSHADER_effectStateChanges *stateChanges);
+DECLSPEC void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
+                                       unsigned int *numPasses,
+                                       int saveShaderState,
+                                       MOJOSHADER_effectStateChanges *stateChanges);
 
 /* Begin an effect pass from the currently applied technique.
  *
@@ -762,8 +762,8 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectBegin(MOJOSHADER_glEffect *glEffect,
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
-                                                      unsigned int pass);
+DECLSPEC void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEffect,
+                                           unsigned int pass);
 
 /* Push render state changes that occurred within an actively rendering pass.
  *
@@ -776,7 +776,7 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectBeginPass(MOJOSHADER_glEffect *glEff
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect);
+DECLSPEC void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect);
 
 /* End an effect pass from the currently applied technique.
  *
@@ -789,7 +789,7 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *g
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffect);
+DECLSPEC void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffect);
 
 /* Complete rendering the effect technique, and restore the render state.
  *
@@ -802,7 +802,7 @@ MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectEndPass(MOJOSHADER_glEffect *glEffec
  * safe, you should probably only call this from the same thread that created
  * the GL context.
  */
-MOJOSHADER_EXPORTFN void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect);
+DECLSPEC void MOJOSHADER_glEffectEnd(MOJOSHADER_glEffect *glEffect);
 
 #endif /* MOJOSHADER_EFFECT_SUPPORT */
 
