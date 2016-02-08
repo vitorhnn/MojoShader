@@ -950,7 +950,7 @@ void freetypeinfo(MOJOSHADER_symbolTypeInfo *typeinfo,
         freetypeinfo(&typeinfo->members[i].info, f, d);
     } // for
     f((void *) typeinfo->members, d);
-} // free_sym_members
+} // freetypeinfo
 
 
 void freevalue(MOJOSHADER_effectValue *value, MOJOSHADER_free f, void *d)
