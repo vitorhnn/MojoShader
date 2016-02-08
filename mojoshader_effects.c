@@ -346,8 +346,37 @@ static void readvalue(const uint8 *base,
     } // else if
     else if (valclass == MOJOSHADER_SYMCLASS_STRUCT)
     {
-        /* TODO: Maybe this is like parse_ctab_typeinfo? -flibit */
-        assert(0 && "Effect struct value parsing not implemented!");
+        const uint32 nummembers = readui32(&typeptr, &typelen);
+        uint32 structsize = 0;
+        for (i = 0; i < nummembers; i++)
+        {
+            const uint32 memtype = readui32(&typeptr, &typelen);
+            const uint32 memclass = readui32(&typeptr, &typelen);
+            /*const uint32 memname =*/ readui32(&typeptr, &typelen);
+            /*const uint32 memsemantic =*/ readui32(&typeptr, &typelen);
+            const uint32 memnumelements = readui32(&typeptr, &typelen);
+
+            assert(memclass >= MOJOSHADER_SYMCLASS_SCALAR && memclass <= MOJOSHADER_SYMCLASS_VECTOR);
+            assert(memtype >= MOJOSHADER_SYMTYPE_BOOL && memtype <= MOJOSHADER_SYMTYPE_FLOAT);
+
+            const uint32 memcolcount = readui32(&typeptr, &typelen);
+            const uint32 memrowcount = readui32(&typeptr, &typelen);
+
+            uint32 memsize = memcolcount * memrowcount;
+            if (memnumelements > 0)
+                memsize *= memnumelements;
+            structsize += memsize;
+        } // for
+
+        value->value_count = structsize;
+        if (numelements > 0)
+            value->value_count *= numelements;
+        value->column_count = value->value_count;
+        value->row_count = 1;
+
+        const uint32 siz = value->value_count * 4;
+        value->values = m(siz, d);
+        memcpy(value->values, typeptr, siz); /* Yes, typeptr. -flibit */
     } // else if
 } // readvalue
 
@@ -1038,7 +1067,8 @@ void copyvalue(MOJOSHADER_effectValue *dst,
     if (dst->value_class == MOJOSHADER_SYMCLASS_SCALAR
      || dst->value_class == MOJOSHADER_SYMCLASS_VECTOR
      || dst->value_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS
-     || dst->value_class == MOJOSHADER_SYMCLASS_MATRIX_COLUMNS)
+     || dst->value_class == MOJOSHADER_SYMCLASS_MATRIX_COLUMNS
+     || dst->value_class == MOJOSHADER_SYMCLASS_STRUCT)
     {
         siz = dst->value_count * 4;
         dst->values = m(siz, d);
@@ -1072,10 +1102,6 @@ void copyvalue(MOJOSHADER_effectValue *dst,
             // !!! FIXME: Out of memory check!
             memcpy(dst->values, src->values, siz);
         } // else
-    } // else if
-    else if (dst->value_class == MOJOSHADER_SYMCLASS_STRUCT)
-    {
-        /* TODO: See readvalue! -flibit */
     } // else if
 
     #undef COPY_STRING
