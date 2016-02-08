@@ -346,6 +346,7 @@ static void readvalue(const uint8 *base,
     } // else if
     else if (valclass == MOJOSHADER_SYMCLASS_STRUCT)
     {
+        // !!! FIXME: struct layout needs to be stored! -flibit
         const uint32 nummembers = readui32(&typeptr, &typelen);
         uint32 structsize = 0;
         for (i = 0; i < nummembers; i++)
