@@ -2917,15 +2917,36 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
         else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
         {
             // Sometimes int/bool parameters get thrown into float registers...
-            j = 0;
-            do
+            if (param->type.parameter_class == MOJOSHADER_SYMCLASS_STRUCT)
             {
-                c = 0;
+                float *struct_offset = param->valuesF;
+                r = 0; /* Register offset */
+                j = 0;
                 do
                 {
-                    regf[start + (j << 2) + c] = (float) param->valuesI[(j * param->type.columns) + c];
-                } while (++c < param->type.columns);
-            } while (++j < sym->register_count);
+                    c = 0;
+                    do
+                    {
+                        memcpy(regf + start + (r << 2),
+                               struct_offset,
+                               param->type.members[c].info.columns << 2);
+                        struct_offset += param->type.members[c].info.columns;
+                        r++;
+                    } while (++c < param->type.member_count);
+                } while (++j < param->type.elements);
+            } // if
+            else
+            {
+                j = 0;
+                do
+                {
+                    c = 0;
+                    do
+                    {
+                        regf[start + (j << 2) + c] = (float) param->valuesI[(j * param->type.columns) + c];
+                    } while (++c < param->type.columns);
+                } while (++j < sym->register_count);
+            } // else
         } // else if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
         {
