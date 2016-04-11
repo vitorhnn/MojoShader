@@ -2862,46 +2862,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
 
         if (param->type.parameter_type == MOJOSHADER_SYMTYPE_FLOAT)
         {
-            // Matrices have to be transposed from row-major to column-major!
-            if (param->type.parameter_class == MOJOSHADER_SYMCLASS_MATRIX_ROWS)
-            {
-                if (param->type.elements > 1)
-                {
-                    const uint32 regcount = sym->register_count / param->type.elements;
-                    j = 0;
-                    do
-                    {
-                        r = 0;
-                        do
-                        {
-                            c = 0;
-                            do
-                            {
-                                const uint32 dest = start + c +
-                                                   (r << 2) +
-                                                  ((j << 2) * regcount);
-                                const uint32 src = r +
-                                                  (c * param->type.rows) +
-                                                  (j * param->type.rows * param->type.columns);
-                                regf[dest] = param->valuesF[src];
-                            } while (++c < param->type.columns);
-                        } while (++r < regcount);
-                    } while (++j < param->type.elements);
-                } // if
-                else
-                {
-                    r = 0;
-                    do
-                    {
-                        c = 0;
-                        do
-                        {
-                            regf[start + (r << 2 ) + c] = param->valuesF[r + (c * param->type.rows)];
-                        } while (++c < param->type.columns);
-                    } while (++r < sym->register_count);
-                } // else
-            } // if
-            else if (sym->register_count > 1)
+            if (sym->register_count > 1)
             {
                 j = 0;
                 do
@@ -2910,7 +2871,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                            param->valuesF + (j * param->type.columns),
                            param->type.columns << 2);
                 } while (++j < sym->register_count);
-            } // else if
+            } // if
             else
                 memcpy(regf + start, param->valuesF, param->type.columns << 2);
         } // if
