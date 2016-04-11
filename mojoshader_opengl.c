@@ -2916,7 +2916,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
         } // if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
         {
-            // Sometimes int/bool parameters get thrown into float registers...
+            // Structs are a whole different world...
             if (param->type.parameter_class == MOJOSHADER_SYMCLASS_STRUCT)
             {
                 float *struct_offset = param->valuesF;
@@ -2937,6 +2937,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             } // if
             else
             {
+                // Sometimes int/bool parameters get thrown into float registers...
                 j = 0;
                 do
                 {
