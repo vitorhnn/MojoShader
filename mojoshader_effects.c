@@ -251,7 +251,7 @@ static void readvalue(const uint8 *base,
                       MOJOSHADER_malloc m,
                       void *d)
 {
-    int i;
+    int i, j, k;
     const uint8 *typeptr = base + typeoffset;
     const uint8 *valptr = base + valoffset;
     unsigned int typelen = 9999999;  // !!! FIXME
@@ -379,7 +379,7 @@ static void readvalue(const uint8 *base,
             mem->info.member_count = 0;
             mem->info.members = NULL;
 
-            uint32 memsize = mem->info.columns * mem->info.rows;
+            uint32 memsize = mem->info.rows * 4;
             if (mem->info.elements > 0)
                 memsize *= mem->info.elements;
             structsize += memsize;
@@ -393,7 +393,24 @@ static void readvalue(const uint8 *base,
 
         siz = value->value_count * 4;
         value->values = m(siz, d);
-        memcpy(value->values, typeptr, siz); /* Yes, typeptr. -flibit */
+        memset(value->values, '\0', siz);
+        int dst_offset = 0, src_offset = 0;
+        i = 0;
+        do
+        {
+            for (j = 0; j < value->type.member_count; j++)
+            {
+                siz = value->type.members[j].info.rows * value->type.members[j].info.elements;
+                for (k = 0; k < siz; k++)
+                {
+                    memcpy(value->valuesF + dst_offset,
+                           typeptr + src_offset, /* Yes, typeptr. -flibit */
+                           value->type.members[j].info.columns << 2);
+                    dst_offset += 4;
+                    src_offset += value->type.members[j].info.columns << 2;
+                } // for
+            }
+        } while (++i < numelements);
     } // else if
 } // readvalue
 

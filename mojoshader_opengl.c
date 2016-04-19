@@ -2868,23 +2868,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
         {
             // Structs are a whole different world...
             if (param->type.parameter_class == MOJOSHADER_SYMCLASS_STRUCT)
-            {
-                float *struct_offset = param->valuesF;
-                r = 0; /* Register offset */
-                j = 0;
-                do
-                {
-                    c = 0;
-                    do
-                    {
-                        memcpy(regf + start + (r << 2),
-                               struct_offset,
-                               param->type.members[c].info.columns << 2);
-                        struct_offset += param->type.members[c].info.columns;
-                        r++;
-                    } while (++c < param->type.member_count);
-                } while (++j < param->type.elements);
-            } // if
+                memcpy(regf + start, param->valuesF, sym->register_count << 4);
             else
             {
                 // Sometimes int/bool parameters get thrown into float registers...
