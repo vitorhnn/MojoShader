@@ -291,7 +291,8 @@ static void readvalue(const uint8 *base,
         siz *= 4;
         value->values = m(siz, d);
         memset(value->values, '\0', siz);
-        for (i = 0; i < rowcount; i++)
+        siz /= 16;
+        for (i = 0; i < siz; i++)
             memcpy(value->valuesF + (i << 2), valptr + ((columncount << 2) * i), columncount << 2);
     } // if
     else if (valclass == MOJOSHADER_SYMCLASS_OBJECT)

@@ -2926,7 +2926,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     MOJOSHADER_effectShader *rawFrag = glEffect->current_frag_raw;
 
     /* Used for shader selection from preshaders */
-    int i;
+    int i, j;
     MOJOSHADER_effectValue *param;
     float selector;
     int shader_object;
@@ -2944,9 +2944,10 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
             do \
             { \
                 param = &glEffect->effect->params[raw->preshader_params[i]].value; \
-                memcpy(raw->preshader->registers + raw->preshader->symbols[i].register_index, \
-                       param->values, \
-                       param->type.columns << 2); \
+                for (j = 0; j < (param->value_count >> 2); j++) \
+                    memcpy(raw->preshader->registers + raw->preshader->symbols[i].register_index + j, \
+                           param->valuesI + (j << 2), \
+                           param->type.columns << 2); \
             } while (++i < raw->preshader->symbol_count); \
             MOJOSHADER_runPreshader(raw->preshader, &selector); \
             shader_object = glEffect->effect->params[raw->params[0]].value.valuesI[(int) selector]; \
