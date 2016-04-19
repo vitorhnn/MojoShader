@@ -726,7 +726,7 @@ static void impl_ARB1_DeleteShader(const GLuint _shader)
 static void impl_ARB1_DeleteProgram(const GLuint program)
 {
     // no-op. ARB1 doesn't have real linked programs.
-} // impl_GLSL_DeleteProgram
+} // impl_ARB1_DeleteProgram
 
 static GLint impl_ARB1_GetUniformLocation(MOJOSHADER_glProgram *program,
                                           MOJOSHADER_glShader *shader, int idx)
@@ -1074,8 +1074,10 @@ static void detect_glsl_version(void)
         const char *str = (const char *) ctx->glGetString(enumval);
         if (ctx->glGetError() == GL_INVALID_ENUM)
             str = NULL;
-        if (strstr(str, "OpenGL ES GLSL ES "))
-            str += 18;
+        if (strstr(str, "OpenGL ES GLSL "))
+            str += 15;
+        if (strstr(str, "ES "))
+            str += 3;
         parse_opengl_version_str(str, &ctx->glsl_major, &ctx->glsl_minor);
     } // if
 #endif
@@ -1279,7 +1281,7 @@ static int valid_profile(const char *profile)
     #if SUPPORT_PROFILE_GLSLES
     else if (strcmp(profile, MOJOSHADER_PROFILE_GLSLES) == 0)
     {
-        MUST_HAVE_GLSL(MOJOSHADER_PROFILE_GLSLES, 1, 10);
+        MUST_HAVE_GLSL(MOJOSHADER_PROFILE_GLSLES, 1, 00);
     } // else if
     #endif
 
