@@ -284,13 +284,15 @@ static void readvalue(const uint8 *base,
         value->type.columns = columncount;
         value->type.rows = rowcount;
 
-        uint32 siz = columncount * rowcount;
+        uint32 siz = 4 * rowcount;
         if (numelements > 0)
             siz *= numelements;
         value->value_count = siz;
         siz *= 4;
         value->values = m(siz, d);
-        memcpy(value->values, valptr, siz);
+        memset(value->values, '\0', siz);
+        for (i = 0; i < rowcount; i++)
+            memcpy(value->valuesF + (i << 2), valptr + ((columncount << 2) * i), columncount << 2);
     } // if
     else if (valclass == MOJOSHADER_SYMCLASS_OBJECT)
     {
@@ -1635,8 +1637,8 @@ void MOJOSHADER_effectSetRawValueHandle(const MOJOSHADER_effectParam *parameter,
                                         const unsigned int offset,
                                         const unsigned int len)
 {
-    // !!! FIXME: uint32* case is arbitary, for Win32 -flibit
-    memcpy((uint32 *) parameter->value.values + offset, data, len);
+    // !!! FIXME: char* case is arbitary, for Win32 -flibit
+    memcpy((char *) parameter->value.values + offset, data, len);
 } // MOJOSHADER_effectSetRawValueHandle
 
 
@@ -1651,8 +1653,8 @@ void MOJOSHADER_effectSetRawValueName(const MOJOSHADER_effect *effect,
     {
         if (strcmp(name, effect->params[i].value.name) == 0)
         {
-            // !!! FIXME: uint32* case is arbitary, for Win32 -flibit
-            memcpy((uint32 *) effect->params[i].value.values + offset, data, len);
+            // !!! FIXME: char* case is arbitary, for Win32 -flibit
+            memcpy((char *) effect->params[i].value.values + offset, data, len);
             return;
         } // if
     } // for

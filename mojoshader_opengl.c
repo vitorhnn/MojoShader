@@ -2861,20 +2861,7 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
         const uint32 start = sym->register_index << 2;
 
         if (param->type.parameter_type == MOJOSHADER_SYMTYPE_FLOAT)
-        {
-            if (sym->register_count > 1)
-            {
-                j = 0;
-                do
-                {
-                    memcpy(regf + start + (j << 2),
-                           param->valuesF + (j * param->type.columns),
-                           param->type.columns << 2);
-                } while (++j < sym->register_count);
-            } // if
-            else
-                memcpy(regf + start, param->valuesF, param->type.columns << 2);
-        } // if
+            memcpy(regf + start, param->valuesF, sym->register_count << 4);
         else if (sym->register_set == MOJOSHADER_SYMREGSET_FLOAT4)
         {
             // Structs are a whole different world...
@@ -2905,34 +2892,29 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
                     c = 0;
                     do
                     {
-                        regf[start + (j << 2) + c] = (float) param->valuesI[(j * param->type.columns) + c];
+                        regf[start + (j << 2) + c] = (float) param->valuesI[(j << 2) + c];
                     } while (++c < param->type.columns);
                 } while (++j < sym->register_count);
             } // else
         } // else if
         else if (sym->register_set == MOJOSHADER_SYMREGSET_INT4)
-        {
-            if (sym->register_count > 1)
-            {
-                j = 0;
-                do
-                {
-                    memcpy(regi + start + (j << 2),
-                           param->valuesI + (j * param->type.columns),
-                           param->type.columns << 2);
-                } while (++j < sym->register_count);
-            } // if
-            else
-                memcpy(regi + start, param->valuesI, param->type.columns << 2);
-        } // else if
+            memcpy(regi + start, param->valuesI, sym->register_count << 4);
         else if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL)
         {
-            j = 0;
-            do
-            {
-                // regb is not a vec4, enjoy this bitshift! -flibit
-                regb[(start >> 2) + j] = param->valuesI[j];
-            } while (++j < sym->register_count);
+             j = 0;
+             r = 0;
+             do
+             {
+                 c = 0;
+                 do
+                 {
+                     // regb is not a vec4, enjoy that 'start' bitshift! -flibit
+                     regb[(start >> 2) + r + c] = param->valuesI[(j << 2) + c];
+                     c++;
+                 } while (c < param->type.columns && ((r + c) < sym->register_count));
+                 r += c;
+                 j++;
+             } while (r < sym->register_count);
         } // else if
     } // for
 } // copy_parameter_data
@@ -2964,7 +2946,7 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
                 param = &glEffect->effect->params[raw->preshader_params[i]].value; \
                 memcpy(raw->preshader->registers + raw->preshader->symbols[i].register_index, \
                        param->values, \
-                       param->value_count << 2); \
+                       param->type.columns << 2); \
             } while (++i < raw->preshader->symbol_count); \
             MOJOSHADER_runPreshader(raw->preshader, &selector); \
             shader_object = glEffect->effect->params[raw->params[0]].value.valuesI[(int) selector]; \
@@ -3010,12 +2992,6 @@ void MOJOSHADER_glEffectCommitChanges(MOJOSHADER_glEffect *glEffect)
     #define COPY_PARAMETER_DATA(raw, stage) \
         if (raw != NULL) \
         { \
-            if (ctx->bound_program->stage##_float4_loc != -1) \
-                memset(ctx->stage##_reg_file_f, '\0', ctx->bound_program->stage##_uniforms_float4_count << 4); \
-            if (ctx->bound_program->stage##_int4_loc != -1) \
-                memset(ctx->stage##_reg_file_i, '\0', ctx->bound_program->stage##_uniforms_int4_count << 4); \
-            if (ctx->bound_program->stage##_bool_loc != -1) \
-                memset(ctx->stage##_reg_file_b, '\0', ctx->bound_program->stage##_uniforms_bool_count << 2); \
             copy_parameter_data(glEffect->effect->params, raw->params, \
                                 raw->shader->symbols, \
                                 raw->shader->symbol_count, \
