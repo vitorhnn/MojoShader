@@ -2903,20 +2903,20 @@ static inline void copy_parameter_data(MOJOSHADER_effectParam *params,
             memcpy(regi + start, param->valuesI, sym->register_count << 4);
         else if (sym->register_set == MOJOSHADER_SYMREGSET_BOOL)
         {
-             j = 0;
-             r = 0;
-             do
-             {
-                 c = 0;
-                 do
-                 {
-                     // regb is not a vec4, enjoy that 'start' bitshift! -flibit
-                     regb[(start >> 2) + r + c] = param->valuesI[(j << 2) + c];
-                     c++;
-                 } while (c < param->type.columns && ((r + c) < sym->register_count));
-                 r += c;
-                 j++;
-             } while (r < sym->register_count);
+            j = 0;
+            r = 0;
+            do
+            {
+                c = 0;
+                do
+                {
+                    // regb is not a vec4, enjoy that 'start' bitshift! -flibit
+                    regb[(start >> 2) + r + c] = param->valuesI[(j << 2) + c];
+                    c++;
+                } while (c < param->type.columns && ((r + c) < sym->register_count));
+                r += c;
+                j++;
+            } while (r < sym->register_count);
         } // else if
     } // for
 } // copy_parameter_data
