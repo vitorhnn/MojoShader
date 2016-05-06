@@ -2638,7 +2638,9 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
             if (usage_str == NULL)
             {
 #if SUPPORT_PROFILE_GLSLES
-                output_line(ctx, "varying highp vec4 io_%i_%i;", usage, index);
+                if (support_glsles(ctx))
+                    output_line(ctx, "varying highp vec4 io_%i_%i;", usage, index);
+                else
 #else
                 output_line(ctx, "varying vec4 io_%i_%i;", usage, index);
 #endif
@@ -2762,7 +2764,9 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
         if (usage_str == NULL)
         {
 #if SUPPORT_PROFILE_GLSLES
-            output_line(ctx, "varying highp vec4 io_%i_%i;", usage, index);
+            if (support_glsles(ctx))
+                output_line(ctx, "varying highp vec4 io_%i_%i;", usage, index);
+            else
 #else
             output_line(ctx, "varying vec4 io_%i_%i;", usage, index);
 #endif
