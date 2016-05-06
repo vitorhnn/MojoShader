@@ -2636,7 +2636,14 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
             push_output(ctx, &ctx->globals);
             // no mapping to built-in var? Just make it a regular global, pray.
             if (usage_str == NULL)
-                output_line(ctx, "vec4 %s;", var);
+            {
+#if SUPPORT_PROFILE_GLSLES
+                output_line(ctx, "varying highp vec4 io_%i_%i;", usage, index);
+#else
+                output_line(ctx, "varying vec4 io_%i_%i;", usage, index);
+#endif
+                output_line(ctx, "#define %s io_%i_%i", var, usage, index);
+            } // if
             else
             {
                 output_line(ctx, "#define %s %s%s%s%s", var, usage_str,
@@ -2719,15 +2726,9 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
 #endif
                     usage_str = "gl_SecondaryColor";
                 } // else if
-                else
-                    fail(ctx, "unsupported color index");
-            } // else if
-
-            else if (usage == MOJOSHADER_USAGE_DEPTH) // !!! FIXME: Possibly more! -flibit
-            {
-                push_output(ctx, &ctx->globals);
-                output_line(ctx, "attribute vec4 %s;", var);
-                pop_output(ctx);
+                // FIXME: Does this even matter when we have varying? -flibit
+                // else
+                //    fail(ctx, "unsupported color index");
             } // else if
         } // else if
 
@@ -2756,13 +2757,23 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
             fail(ctx, "unknown pixel shader attribute register");
         } // else
 
-        if (usage_str != NULL)
+        push_output(ctx, &ctx->globals);
+        // no mapping to built-in var? Just make it a regular global, pray.
+        if (usage_str == NULL)
         {
-            push_output(ctx, &ctx->globals);
+#if SUPPORT_PROFILE_GLSLES
+            output_line(ctx, "varying highp vec4 io_%i_%i;", usage, index);
+#else
+            output_line(ctx, "varying vec4 io_%i_%i;", usage, index);
+#endif
+            output_line(ctx, "#define %s io_%i_%i", var, usage, index);
+        } // if
+        else
+        {
             output_line(ctx, "#define %s %s%s%s%s", var, usage_str,
                         arrayleft, index_str, arrayright);
-            pop_output(ctx);
-        } // if
+        } // else
+        pop_output(ctx);
     } // else if
 
     else
