@@ -2728,7 +2728,7 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
 #endif
                     usage_str = "gl_SecondaryColor";
                 } // else if
-                // FIXME: Does this even matter when we have varying? -flibit
+                // FIXME: Does this even matter when we have varyings? -flibit
                 // else
                 //    fail(ctx, "unsupported color index");
             } // else if
