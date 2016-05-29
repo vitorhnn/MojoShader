@@ -4082,7 +4082,7 @@ static const char *get_METAL_varname_in_buf(Context *ctx, RegisterType rt,
 
     // We don't separate vars with vs_ or ps_ here, because, for the most part,
     //  there are only local vars in Metal shaders.
-    snprintf(buf,len,"%s%s", regtype_str, regnum_str);
+    snprintf(buf, len, "%s%s", regtype_str, regnum_str);
     return buf;
 } // get_METAL_varname_in_buf
 
@@ -4099,7 +4099,7 @@ static inline const char *get_METAL_const_array_varname_in_buf(Context *ctx,
                                                 const int base, const int size,
                                                 char *buf, const size_t buflen)
 {
-    snprintf(buf, buflen, "%s_const_array_%d_%d", ctx->mainfn, base, size);
+    snprintf(buf, buflen, "const_array_%d_%d", base, size);
     return buf;
 } // get_METAL_const_array_varname_in_buf
 
@@ -4681,10 +4681,11 @@ static void emit_METAL_global(Context *ctx, RegisterType regtype, int regnum)
 
 static void emit_METAL_array(Context *ctx, VariableList *var)
 {
-    // All uniforms (except constant arrays, which only get pushed once at
-    //  compile time) are now packed into a single array, so we can batch
-    //  the uniform transfers. So this doesn't actually define an array
-    //  here; the one, big array is emitted during finalization instead.
+    // All uniforms (except constant arrays, which are literally constant
+    //  data embedded in Metal shaders) are now packed into a single array,
+    //  so we can batch the uniform transfers. So this doesn't actually
+    //  define an array here; the one, big array is emitted during
+    //  finalization instead.
     // However, we need to #define the offset into the one, big array here,
     //  and let dereferences use that #define.
     const int base = var->index;
@@ -4703,8 +4704,9 @@ static void emit_METAL_const_array(Context *ctx, const ConstantsList *clist,
     get_METAL_const_array_varname_in_buf(ctx,base,size,varname,sizeof(varname));
 
     const char *cstr = NULL;
-    push_output(ctx, &ctx->globals);
-    output_line(ctx, "constant float4 %s[%d] = {", varname, size);
+    push_output(ctx, &ctx->mainline_top);
+    ctx->indent++;
+    output_line(ctx, "const float4 %s[%d] = {", varname, size);
     ctx->indent++;
 
     int i;
@@ -4731,6 +4733,7 @@ static void emit_METAL_const_array(Context *ctx, const ConstantsList *clist,
 
     ctx->indent--;
     output_line(ctx, "};");
+    output_line(ctx, "(void) %s[0];", varname);  // stop compiler warnings.
     pop_output(ctx);
 } // emit_METAL_const_array
 
@@ -11156,7 +11159,6 @@ static Context *build_context(const char *profile,
     ctx->errors = errorlist_create(MallocBridge, FreeBridge, ctx);
     if (ctx->errors == NULL)
     {
-        f((void *) ctx->mainfn, d);
         f(ctx, d);
         return NULL;
     } // if
@@ -11164,13 +11166,17 @@ static Context *build_context(const char *profile,
     if (!set_output(ctx, &ctx->mainline))
     {
         errorlist_destroy(ctx->errors);
-        f((void *) ctx->mainfn, d);
         f(ctx, d);
         return NULL;
     } // if
 
-    if (mainfn)
-        ctx->mainfn = StrDup(ctx, mainfn);
+    if (mainfn != NULL)
+    {
+        if (strlen(mainfn) > 55)  // !!! FIXME: just to keep things sane. Lots of hardcoded stack arrays...
+            failf(ctx, "Main function name '%s' is too big", mainfn);
+        else
+            ctx->mainfn = StrDup(ctx, mainfn);
+    } // if
 
     if (profile != NULL)
     {
