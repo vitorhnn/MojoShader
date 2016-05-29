@@ -379,7 +379,7 @@ static void readvalue(const uint8 *base,
             mem->info.member_count = 0;
             mem->info.members = NULL;
 
-            uint32 memsize = mem->info.rows * 4;
+            uint32 memsize = 4 * mem->info.rows;
             if (mem->info.elements > 0)
                 memsize *= mem->info.elements;
             structsize += memsize;
@@ -642,9 +642,11 @@ static void readsmallobjects(const uint32 numsmallobjects,
         else if (object->type == MOJOSHADER_SYMTYPE_PIXELSHADER
               || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
+            char mainfn[32];
+            snprintf(mainfn, sizeof (mainfn), "ShaderFunction%u", (unsigned int) index);
             object->shader.technique = -1;
             object->shader.pass = -1;
-            object->shader.shader = MOJOSHADER_parse(profile, *ptr, length,
+            object->shader.shader = MOJOSHADER_parse(profile, mainfn, *ptr, length,
                                                      swiz, swizcount, smap, smapcount,
                                                      m, f, d);
             // !!! FIXME: check for errors.
@@ -743,7 +745,7 @@ static void readlargeobjects(const uint32 numlargeobjects,
                  */
                 object->shader.is_preshader = 1;
                 const uint32 start = *((uint32 *) *ptr) + 4;
-                const uint32 end = 24; // FIXME: Why? -flibit
+                const uint32 end = 16; // FIXME: Why? -flibit
                 const char *array = readstring(*ptr, 0, m, d);
                 object->shader.param_count = 1;
                 object->shader.params = (uint32 *) m(sizeof (uint32), d);
@@ -765,7 +767,9 @@ static void readlargeobjects(const uint32 numlargeobjects,
             } // if
             else
             {
-                object->shader.shader = MOJOSHADER_parse(emitter, *ptr, length,
+                char mainfn[32];
+                snprintf(mainfn, sizeof (mainfn), "ShaderFunction%u", (unsigned int) objectIndex);
+                object->shader.shader = MOJOSHADER_parse(emitter, mainfn, *ptr, length,
                                                          swiz, swizcount, smap, smapcount,
                                                          m, f, d);
                 // !!! FIXME: check for errors.
@@ -1061,7 +1065,7 @@ void MOJOSHADER_freeEffect(const MOJOSHADER_effect *_effect)
          || object->type == MOJOSHADER_SYMTYPE_VERTEXSHADER)
         {
             if (object->shader.is_preshader)
-                MOJOSHADER_freePreshader(object->shader.preshader, f, d);
+                MOJOSHADER_freePreshader(object->shader.preshader);
             else
                 MOJOSHADER_freeParseData(object->shader.shader);
             f((void *) object->shader.params, d);
