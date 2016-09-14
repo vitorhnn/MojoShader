@@ -51,6 +51,19 @@
 #define GL_PROGRAM_POINT_SIZE 0x8642
 #endif
 
+// FIXME: ARB_gl_spirv in glext.h? -flibit
+#ifndef GL_ARB_gl_spirv
+#define GL_ARB_gl_spirv 1
+#define GL_SHADER_BINARY_FORMAT_SPIR_V_ARB 0x9551
+typedef void (APIENTRYP PFNGLSPECIALIZESHADERARBPROC) (
+    GLuint shader,
+    const GLchar* pEntryPoint,
+    GLuint numSpecializationConstants,
+    const GLuint* pConstantIndex,
+    const GLuint* pConstantValue
+);
+#endif
+
 struct MOJOSHADER_glShader
 {
     const MOJOSHADER_parseData *parseData;
@@ -200,6 +213,8 @@ struct MOJOSHADER_glContext
     int have_GL_ARB_half_float_vertex;
     int have_GL_OES_vertex_half_float;
     int have_GL_ARB_instanced_arrays;
+    int have_GL_ARB_ES2_compatibility;
+    int have_GL_ARB_gl_spirv;
 
     // Entry points...
     PFNGLGETSTRINGPROC glGetString;
@@ -260,6 +275,8 @@ struct MOJOSHADER_glContext
     PFNGLBINDPROGRAMARBPROC glBindProgramARB;
     PFNGLPROGRAMSTRINGARBPROC glProgramStringARB;
     PFNGLVERTEXATTRIBDIVISORARBPROC glVertexAttribDivisorARB;
+    PFNGLSHADERBINARYPROC glShaderBinary;
+    PFNGLSPECIALIZESHADERARBPROC glSpecializeShaderARB;
 
     // interface for profile-specific things.
     int (*profileMaxUniforms)(MOJOSHADER_shaderType shader_type);
@@ -373,7 +390,7 @@ static inline void toggle_gl_state(GLenum state, int val)
 
 // profile-specific implementations...
 
-#if SUPPORT_PROFILE_GLSL
+#if SUPPORT_PROFILE_GLSL || SUPPORT_PROFILE_SPIRV
 static inline GLenum glsl_shader_type(const MOJOSHADER_shaderType t)
 {
     // these enums match between core 2.0 and the ARB extensions.
@@ -407,6 +424,33 @@ static int impl_GLSL_MaxUniforms(MOJOSHADER_shaderType shader_type)
 } // impl_GLSL_MaxUniforms
 
 
+#if SUPPORT_PROFILE_SPIRV
+static int impl_SPIRV_CompileShader(const MOJOSHADER_parseData *pd, GLuint *s)
+{
+    GLint ok = 0;
+
+    const GLuint shader = ctx->glCreateShader(glsl_shader_type(pd->shader_type));
+    ctx->glShaderBinary(1, &shader, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, &pd->output, (GLsizei) pd->output_len);
+    ctx->glSpecializeShaderARB(shader, pd->mainfn, 0, NULL, NULL); // FIXME: Spec Constants? -flibit
+    ctx->glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+    if (!ok)
+    {
+        GLsizei len = 0;
+        ctx->glGetShaderInfoLog(shader, sizeof (error_buffer), &len,
+                             (GLchar *) error_buffer);
+        ctx->glDeleteShader(shader);
+        *s = 0;
+        return 0;
+    } // if
+
+    *s = shader;
+
+    return 1;
+}
+#endif // SUPPORT_PROFILE_SPIRV
+
+
+#if SUPPORT_PROFILE_GLSL
 static int impl_GLSL_CompileShader(const MOJOSHADER_parseData *pd, GLuint *s)
 {
     GLint ok = 0;
@@ -454,6 +498,7 @@ static int impl_GLSL_CompileShader(const MOJOSHADER_parseData *pd, GLuint *s)
 
     return 1;
 } // impl_GLSL_CompileShader
+#endif // SUPPORT_PROFILE_GLSL
 
 
 static void impl_GLSL_DeleteShader(const GLuint shader)
@@ -655,7 +700,7 @@ static void impl_GLSL_PushSampler(GLint loc, GLuint sampler)
     ctx->glUniform1i(loc, sampler);
 } // impl_GLSL_PushSampler
 
-#endif  // SUPPORT_PROFILE_GLSL
+#endif // SUPPORT_PROFILE_GLSL || SUPPORT_PROFILE_SPIRV
 
 
 #if SUPPORT_PROFILE_ARB1
@@ -1002,6 +1047,8 @@ static void lookup_entry_points(MOJOSHADER_glGetProcAddress lookup, void *d)
     DO_LOOKUP(GL_ARB_vertex_program, PFNGLPROGRAMSTRINGARBPROC, glProgramStringARB);
     DO_LOOKUP(GL_NV_gpu_program4, PFNGLPROGRAMLOCALPARAMETERI4IVNVPROC, glProgramLocalParameterI4ivNV);
     DO_LOOKUP(GL_ARB_instanced_arrays, PFNGLVERTEXATTRIBDIVISORARBPROC, glVertexAttribDivisorARB);
+    DO_LOOKUP(GL_ARB_ES2_compatibility, PFNGLSHADERBINARYPROC, glShaderBinary);
+    DO_LOOKUP(GL_ARB_gl_spirv, PFNGLSPECIALIZESHADERARBPROC, glSpecializeShaderARB);
 
     #undef DO_LOOKUP
 } // lookup_entry_points
@@ -1120,6 +1167,8 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
     ctx->have_GL_ARB_half_float_vertex = 1;
     ctx->have_GL_OES_vertex_half_float = 1;
     ctx->have_GL_ARB_instanced_arrays = 1;
+    ctx->have_GL_ARB_ES2_compatibility = 1;
+    ctx->have_GL_ARB_gl_spirv = 1;
 
     lookup_entry_points(lookup, d);
 
@@ -1218,6 +1267,8 @@ static void load_extensions(MOJOSHADER_glGetProcAddress lookup, void *d)
     VERIFY_EXT(GL_ARB_half_float_vertex, 3, 0);
     VERIFY_EXT(GL_OES_vertex_half_float, -1, -1);
     VERIFY_EXT(GL_ARB_instanced_arrays, 3, 3);
+    VERIFY_EXT(GL_ARB_ES2_compatibility, 4, 1);
+    VERIFY_EXT(GL_ARB_gl_spirv, -1, -1);
 
     #undef VERIFY_EXT
 
@@ -1278,6 +1329,14 @@ static int valid_profile(const char *profile)
     } // else if
     #endif
 
+    #if SUPPORT_PROFILE_SPIRV
+    else if (strcmp(profile, MOJOSHADER_PROFILE_SPIRV) == 0)
+    {
+        MUST_HAVE(MOJOSHADER_PROFILE_SPIRV, GL_ARB_ES2_compatibility);
+        MUST_HAVE(MOJOSHADER_PROFILE_SPIRV, GL_ARB_gl_spirv);
+    } // else if
+    #endif
+
     #if SUPPORT_PROFILE_GLSLES
     else if (strcmp(profile, MOJOSHADER_PROFILE_GLSLES) == 0)
     {
@@ -1312,6 +1371,9 @@ static int valid_profile(const char *profile)
 
 
 static const char *profile_priorities[] = {
+#if SUPPORT_PROFILE_SPIRV
+    MOJOSHADER_PROFILE_SPIRV,
+#endif
 #if SUPPORT_PROFILE_GLSL120
     MOJOSHADER_PROFILE_GLSL120,
 #endif
@@ -1439,6 +1501,28 @@ MOJOSHADER_glContext *MOJOSHADER_glCreateContext(const char *profile,
 
     // !!! FIXME: generalize this part.
     if (profile == NULL) {}
+
+    // We don't check SUPPORT_PROFILE_SPIRV here, since valid_profile() does.
+#if SUPPORT_PROFILE_SPIRV
+    if (strcmp(profile, MOJOSHADER_PROFILE_SPIRV) == 0)
+    {
+        ctx->profileMaxUniforms = impl_GLSL_MaxUniforms;
+        ctx->profileCompileShader = impl_SPIRV_CompileShader;
+        ctx->profileDeleteShader = impl_GLSL_DeleteShader;
+        ctx->profileDeleteProgram = impl_GLSL_DeleteProgram;
+        ctx->profileGetAttribLocation = impl_GLSL_GetAttribLocation;
+        ctx->profileGetUniformLocation = impl_GLSL_GetUniformLocation;
+        ctx->profileGetSamplerLocation = impl_GLSL_GetSamplerLocation;
+        ctx->profileLinkProgram = impl_GLSL_LinkProgram;
+        ctx->profileFinalInitProgram = impl_GLSL_FinalInitProgram;
+        ctx->profileUseProgram = impl_GLSL_UseProgram;
+        ctx->profilePushConstantArray = impl_GLSL_PushConstantArray;
+        ctx->profilePushUniforms = impl_GLSL_PushUniforms;
+        ctx->profilePushSampler = impl_GLSL_PushSampler;
+        ctx->profileMustPushConstantArrays = impl_GLSL_MustPushConstantArrays;
+        ctx->profileMustPushSamplers = impl_GLSL_MustPushSamplers;
+    } // if
+#endif
 
     // We don't check SUPPORT_PROFILE_GLSL120/ES here, since valid_profile() does.
 #if SUPPORT_PROFILE_GLSL
