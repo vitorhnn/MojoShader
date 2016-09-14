@@ -54,6 +54,25 @@ typedef struct RegisterList
     struct RegisterList *next;
 } RegisterList;
 
+#if SUPPORT_PROFILE_SPIRV
+// For baked-in constants in SPIR-V we want to store scalar values that we can
+// use in composites, since OpConstantComposite uses result ids constituates
+// rather than value literals.
+// We'll store these lists grouped by type and have the lists themselves
+// ordered by value in the ctx.spirv struct.
+typedef struct ComponentList
+{
+    // result id from OpConstant
+    uint32 id;
+    union {
+        float f;
+        int i;
+        uint32 u;
+    } v;
+    struct ComponentList *next;
+} ComponentList;
+#endif
+
 typedef struct
 {
     const uint32 *token;   // this is the unmolested token in the stream.
@@ -221,6 +240,7 @@ typedef struct Context
             uint32 idbool;
             uint32 idfloat;
             uint32 idint;
+            uint32 iduint;
             uint32 idvec4;
             uint32 idivec4;
             uint32 idptrvec4u;
@@ -231,6 +251,11 @@ typedef struct Context
             uint32 idptrivec4o;
             uint32 idptrfloato;
         } types;
+        struct {
+            ComponentList f;
+            ComponentList i;
+            ComponentList u;
+        } cl;
     } spirv;
 #endif
 } Context;
@@ -8803,10 +8828,27 @@ static uint32 spv_getint(Context *ctx)
     } // if
 
     id = spv_bumpid(ctx);
-    output_spvop(ctx, SpvOpTypeInt, 3);
+    output_spvop(ctx, SpvOpTypeInt, 4);
     output_u32(ctx, id);
     output_u32(ctx, 32);
+    output_u32(ctx, 1);
     return ctx->spirv.types.idint = id;
+} // spv_getint
+
+static uint32 spv_getuint(Context *ctx)
+{
+    uint32 id;
+    if (ctx->spirv.types.iduint)
+    {
+        return ctx->spirv.types.iduint;
+    } // if
+
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeInt, 4);
+    output_u32(ctx, id);
+    output_u32(ctx, 32);
+    output_u32(ctx, 0);
+    return ctx->spirv.types.iduint = id;
 } // spv_getint
 
 static uint32 spv_getvec4(Context *ctx)
@@ -9204,6 +9246,7 @@ static void emit_SPIRV_ADD(Context *ctx)
     lr = spv_getreg(ctx, ctx->source_args[0].regtype, ctx->source_args[0].regnum);
     rr = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
     if (lr == NULL || rr == NULL) { failf(ctx, "lr == NULL || rr == NULL"); }
+    fprintf(stderr, "%s: lr=t:%u,n:%d rr=t:%u,n:%d\n", __func__, lr->regtype, lr->regnum, rr->regtype, rr->regnum);
 } // emit_SPIRV_ADD
 
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
