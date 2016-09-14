@@ -44,6 +44,12 @@ typedef struct RegisterList
     int writemask;
     int misc;
     int written;
+#if SUPPORT_PROFILE_SPIRV
+    struct {
+        uint32 iddecl;
+        uint32 iduse;
+    } spirv;
+#endif
     const VariableList *array;
     struct RegisterList *next;
 } RegisterList;
@@ -199,6 +205,33 @@ typedef struct Context
     int metal_need_header_geometric;
     int metal_need_header_graphics;
     int metal_need_header_texture;
+#endif
+
+#if SUPPORT_PROFILE_SPIRV
+    struct {
+        // ext. glsl instructions have been imported
+        uint32 idext;
+        uint32 idmax;
+        uint32 idmain;
+        uint32 inoutcount;
+        // ids for types so we can reuse them after they're declared
+        struct {
+            uint32 idvoid;
+            uint32 idfuncv;
+            uint32 idbool;
+            uint32 idfloat;
+            uint32 idint;
+            uint32 idvec4;
+            uint32 idivec4;
+            uint32 idptrvec4u;
+            uint32 idptrivec4u;
+            uint32 idptrvec4i;
+            uint32 idptrivec4i;
+            uint32 idptrvec4o;
+            uint32 idptrivec4o;
+            uint32 idptrfloato;
+        } types;
+    } spirv;
 #endif
 } Context;
 
@@ -563,6 +596,10 @@ static RegisterList *reglist_insert(Context *ctx, RegisterList *prev,
         item->writemask = 0;
         item->misc = 0;
         item->written = 0;
+#if SUPPORT_PROFILE_SPIRV
+        item->spirv.iddecl = 0;
+        item->spirv.iduse = 0;
+#endif
         item->array = NULL;
         item->next = prev->next;
         prev->next = item;
@@ -8554,6 +8591,704 @@ static void emit_ARB1_TEXLD(Context *ctx)
 
 #endif  // SUPPORT_PROFILE_ARB1
 
+#if !SUPPORT_PROFILE_SPIRV
+#define PROFILE_EMITTER_SPIRV(op)
+#else
+#undef AT_LEAST_ONE_PROFILE
+#define AT_LEAST_ONE_PROFILE 1
+#define PROFILE_EMITTER_SPIRV(op) emit_SPIRV_##op,
+
+#define EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(op) \
+    static void emit_SPIRV_##op(Context *ctx) { \
+        /* fail(ctx, #op " unimplemented in spirv profile"); */ \
+        fprintf(stderr, "%s\n", #op " unimplemented in spirv profile"); \
+    }
+
+#include "spirv/spirv.h"
+#include "spirv/GLSL.std.450.h"
+
+static uint32 spv_bumpid(Context *ctx)
+{
+    return (ctx->spirv.idmax += 1);
+} // spv_bumpid
+
+static RegisterList *spv_getreg(Context *ctx, const RegisterType regtype, const int regnum)
+{
+    RegisterList *r = reglist_find(&ctx->used_registers, regtype, regnum);
+    if (!r) {
+        failf(ctx, "register not found rt=%d, rn=%d", regtype, regnum);
+        return NULL;
+    }
+    return r;
+} // spv_getreg
+
+static uint32 spv_loadreg(Context *ctx, RegisterList *r)
+{
+    failf(ctx, "function %s not implemented", __func__);
+} // spv_loadreg
+
+static const char *get_SPIRV_varname_in_buf(Context *ctx, const RegisterType rt,
+                                           const int regnum, char *buf,
+                                           const size_t buflen)
+{
+    // turns out these are identical at the moment.
+    return get_D3D_varname_in_buf(ctx, rt, regnum, buf, buflen);
+} // get_SPIRV_varname_in_buf
+
+static const char *get_SPIRV_varname(Context *ctx, const RegisterType rt,
+                                    const int regnum)
+{
+    // turns out these are identical at the moment.
+    return get_D3D_varname(ctx, rt, regnum);
+} // get_SPIRV_varname
+
+
+static inline const char *get_SPIRV_const_array_varname_in_buf(Context *ctx,
+                                                const int base, const int size,
+                                                char *buf, const size_t buflen)
+{
+    snprintf(buf, buflen, "c_array_%d_%d", base, size);
+    return buf;
+} // get_SPIRV_const_array_varname_in_buf
+
+
+static const char *get_SPIRV_const_array_varname(Context *ctx, int base, int size)
+{
+    char buf[64];
+    get_SPIRV_const_array_varname_in_buf(ctx, base, size, buf, sizeof (buf));
+    return StrDup(ctx, buf);
+} // get_SPIRV_const_array_varname
+
+
+static void output_u32(Context *ctx, uint32 word)
+{
+    assert(ctx->output != NULL);
+    if (isfail(ctx))
+        return;  // we failed previously, don't go on...
+
+    buffer_append(ctx->output, &word, sizeof(word));
+} // output_u32
+
+// (len) total op length in words, includes opcode + all params
+static void output_spvop(Context *ctx, uint32 op, uint32 len)
+{
+    assert(ctx->output != NULL);
+    if (isfail(ctx))
+        return;  // we failed previously, don't go on...
+
+    output_u32(ctx, op | (len << 16));
+} // output_spvop
+
+static void output_spvstr(Context *ctx, const char *str)
+{
+    size_t len;
+    uint32 trail;
+    assert(ctx->output != NULL);
+    if (isfail(ctx))
+        return;  // we failed previously, don't go on...
+
+    if (str == NULL) {
+        return output_u32(ctx, 0);
+    }
+    len = strlen(str) + 1;
+    buffer_append(ctx->output, str, len);
+    len = len % 4;
+    if (len) {
+        trail = 0;
+        buffer_append(ctx->output, &trail, 4 - len);
+    }
+} // output_spvstr
+
+// get the word count of a string
+static uint32 spv_strlen(const char *str)
+{
+    size_t len = strlen(str);
+    return (uint32) (
+        len / 4 + 1
+    );
+} // spv_strlen
+
+// emits an OpName straight into ctx->globals
+static void output_spvname(Context *ctx, uint32 id, const char *str)
+{
+    if (isfail(ctx))
+        return;  // we failed previously, don't go on...
+
+    push_output(ctx, &ctx->globals);
+    output_spvop(ctx, SpvOpName, 2 + spv_strlen(str));
+    output_u32(ctx, id);
+    output_spvstr(ctx, str);
+    pop_output(ctx);
+} // output_spvname
+
+// emits an OpDecorate BuiltIn straight into ctx->helpers
+static void output_spvbuiltin(Context *ctx, uint32 id, SpvBuiltIn builtin)
+{
+    if (isfail(ctx))
+        return;  // we failed previously, don't go on...
+
+    push_output(ctx, &ctx->helpers);
+    output_spvop(ctx, SpvOpDecorate, 4);
+    output_u32(ctx, id);
+    output_u32(ctx, SpvDecorationBuiltIn);
+    output_u32(ctx, builtin);
+    pop_output(ctx);
+} // output_spvbuiltin
+
+static uint32 spv_getvoid(Context *ctx)
+{
+    uint32 id;
+    if (ctx->spirv.types.idvoid)
+    {
+        return ctx->spirv.types.idvoid;
+    } // if
+
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeVoid, 2);
+    output_u32(ctx, id);
+    return ctx->spirv.types.idvoid = id;
+} // spv_getvoid
+
+static uint32 spv_getfuncv(Context *ctx)
+{
+    uint32 id, vid;
+    if (ctx->spirv.types.idfuncv)
+    {
+        return ctx->spirv.types.idfuncv;
+    } // if
+
+    vid = spv_getvoid(ctx);
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeFunction, 3);
+    output_u32(ctx, id);
+    output_u32(ctx, vid);
+    return ctx->spirv.types.idfuncv = id;
+} // spv_getfuncv
+
+static uint32 spv_getbool(Context *ctx)
+{
+    uint32 id;
+    if (ctx->spirv.types.idbool)
+    {
+        return ctx->spirv.types.idbool;
+    } // if
+
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeBool, 2);
+    output_u32(ctx, id);
+    return ctx->spirv.types.idbool = id;
+} // spv_getbool
+
+static uint32 spv_getfloat(Context *ctx)
+{
+    uint32 id;
+    if (ctx->spirv.types.idfloat)
+    {
+        return ctx->spirv.types.idfloat;
+    } // if
+
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeFloat, 3);
+    output_u32(ctx, id);
+    output_u32(ctx, 32);
+    return ctx->spirv.types.idfloat = id;
+} // spv_getfloat
+
+static uint32 spv_getint(Context *ctx)
+{
+    uint32 id;
+    if (ctx->spirv.types.idint)
+    {
+        return ctx->spirv.types.idint;
+    } // if
+
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeInt, 3);
+    output_u32(ctx, id);
+    output_u32(ctx, 32);
+    return ctx->spirv.types.idint = id;
+} // spv_getint
+
+static uint32 spv_getvec4(Context *ctx)
+{
+    uint32 id, fid;
+    if (ctx->spirv.types.idvec4)
+    {
+        return ctx->spirv.types.idvec4;
+    } // if
+
+    fid = spv_getfloat(ctx);
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeVector, 4);
+    output_u32(ctx, id);
+    output_u32(ctx, fid);
+    output_u32(ctx, 4);
+    return ctx->spirv.types.idvec4 = id;
+} // spv_getvec4
+
+static uint32 spv_getivec4(Context *ctx)
+{
+    uint32 id, iid;
+    if (ctx->spirv.types.idivec4)
+    {
+        return ctx->spirv.types.idivec4;
+    } // if
+
+    iid = spv_getint(ctx);
+    id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpTypeVector, 4);
+    output_u32(ctx, id);
+    output_u32(ctx, iid);
+    output_u32(ctx, 4);
+    return ctx->spirv.types.idivec4 = id;
+} // spv_getvec4i
+
+#define SPV_MAKE_GETPTR(_var, _from, _storageclass) \
+    static uint32 spv_get ## _var(Context *ctx) \
+    { \
+        uint32 id, fid; \
+        if (ctx->spirv.types.id ## _var) { \
+            return ctx->spirv.types.id ## _var; \
+        } \
+        fid = spv_get ## _from(ctx); \
+        id = spv_bumpid(ctx); \
+        output_spvop(ctx, SpvOpTypePointer, 4); \
+        output_u32(ctx, id); \
+        output_u32(ctx, SpvStorageClass ## _storageclass); \
+        output_u32(ctx, fid); \
+        return ctx->spirv.types.id ## _var = id; \
+    }
+
+SPV_MAKE_GETPTR(ptrvec4u, vec4, Uniform);
+SPV_MAKE_GETPTR(ptrivec4u, ivec4, Uniform);
+SPV_MAKE_GETPTR(ptrvec4i, vec4, Input);
+SPV_MAKE_GETPTR(ptrivec4i, ivec4, Input);
+SPV_MAKE_GETPTR(ptrvec4o, vec4, Output);
+SPV_MAKE_GETPTR(ptrivec4o, ivec4, Output);
+
+SPV_MAKE_GETPTR(ptrfloato, float, Output);
+
+#undef SPV_MAKE_GETPTR
+
+static uint32 spv_getext(Context *ctx)
+{
+    if (ctx->spirv.idext)
+    {
+        return ctx->spirv.idext;
+    } // if
+
+    return ctx->spirv.idext = spv_bumpid(ctx);
+} // spv_getext
+
+static void emit_SPIRV_start(Context *ctx, const char *profilestr)
+{
+    if (!(
+        shader_is_vertex(ctx) ||
+        shader_is_pixel(ctx)
+    ))
+    {
+        failf(ctx, "Shader type %u unsupported in this profile.",
+              (uint) ctx->shader_type);
+        return;
+    } // if
+
+    if (strcmp(profilestr, MOJOSHADER_PROFILE_SPIRV) != 0)
+    {
+        failf(ctx, "Profile '%s' unsupported or unknown.", profilestr);
+    } // if
+
+    memset(&(ctx->spirv), '\0', sizeof(ctx->spirv));
+
+    push_output(ctx, &ctx->mainline_intro);
+
+    ctx->spirv.idmain = spv_bumpid(ctx);
+
+    // calls spv_getvoid as well
+    spv_getfuncv(ctx);
+
+    pop_output(ctx);
+
+    // slap the function declaration itself in mainline_top, so we can do type
+    // declaration in mainline_intro (= before this in the output)
+    push_output(ctx, &ctx->mainline_top);
+
+    output_spvop(ctx, SpvOpFunction, 5);
+    output_u32(ctx, spv_getvoid(ctx));
+    output_u32(ctx, ctx->spirv.idmain);
+    output_u32(ctx, SpvFunctionControlMaskNone);
+    output_u32(ctx, spv_getfuncv(ctx));
+
+    output_spvop(ctx, SpvOpLabel, 2);
+    output_u32(ctx, spv_bumpid(ctx));
+
+    pop_output(ctx);
+
+    // also emit the name for the function
+    push_output(ctx, &ctx->globals);
+
+    output_spvop(ctx, SpvOpName, 2 + spv_strlen(ctx->mainfn));
+    output_u32(ctx, ctx->spirv.idmain);
+    output_spvstr(ctx, ctx->mainfn);
+
+    pop_output(ctx);
+
+    set_output(ctx, &ctx->mainline);
+} // emit_SPIRV_start
+
+static void emit_SPIRV_end(Context *ctx)
+{
+} // emit_SPIRV_end
+
+static void emit_SPIRV_phase(Context *ctx){
+    // no-op
+} // emit_SPIRV_phase
+
+static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum){}
+static void emit_SPIRV_array(Context *ctx, VariableList *var){}
+static void emit_SPIRV_const_array(Context *ctx,
+                                   const struct ConstantsList *constslist,
+                                   int base, int size){}
+static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
+                               const VariableList *var){}
+static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype,
+                               int texbem){}
+
+static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
+                                 MOJOSHADER_usage usage, int index, int wmask,
+                                 int flags)
+{
+    char varname[64];
+    uint32 tid;
+    RegisterList *r = spv_getreg(ctx, regtype, regnum);
+
+    r->spirv.iddecl = spv_bumpid(ctx);
+    ctx->spirv.inoutcount += 1;
+
+    // for OpName
+    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
+
+    if (shader_is_vertex(ctx))
+    {
+        // pre-vs3 output registers.
+        // these don't ever happen in DCL opcodes, I think. Map to vs_3_*
+        //  output registers.
+        if (!shader_version_atleast(ctx, 3, 0))
+        {
+            if (regtype == REG_TYPE_RASTOUT)
+            {
+                regtype = REG_TYPE_OUTPUT;
+                index = regnum;
+                switch ((const RastOutType) regnum)
+                {
+                    case RASTOUT_TYPE_POSITION:
+                        usage = MOJOSHADER_USAGE_POSITION;
+                        break;
+                    case RASTOUT_TYPE_FOG:
+                        usage = MOJOSHADER_USAGE_FOG;
+                        break;
+                    case RASTOUT_TYPE_POINT_SIZE:
+                        usage = MOJOSHADER_USAGE_POINTSIZE;
+                        break;
+                } // switch
+            } // if
+
+            else if (regtype == REG_TYPE_ATTROUT)
+            {
+                regtype = REG_TYPE_OUTPUT;
+                usage = MOJOSHADER_USAGE_COLOR;
+                index = regnum;
+            } // else if
+
+            else if (regtype == REG_TYPE_TEXCRDOUT)
+            {
+                regtype = REG_TYPE_OUTPUT;
+                usage = MOJOSHADER_USAGE_TEXCOORD;
+                index = regnum;
+            } // else if
+        } // if
+
+        if (regtype == REG_TYPE_INPUT)
+        {
+            push_output(ctx, &ctx->mainline_intro);
+            tid = spv_getptrvec4i(ctx);
+
+            output_spvop(ctx, SpvOpVariable, 4);
+            output_u32(ctx, tid);
+            output_u32(ctx, r->spirv.iddecl);
+            output_u32(ctx, SpvStorageClassInput);
+            pop_output(ctx);
+
+            output_spvname(ctx, r->spirv.iddecl, varname);
+        } // if
+
+        else if (regtype == REG_TYPE_OUTPUT)
+        {
+            push_output(ctx, &ctx->mainline_intro);
+            tid = spv_getptrvec4o(ctx);
+
+            output_spvop(ctx, SpvOpVariable, 4);
+            output_u32(ctx, tid);
+            output_u32(ctx, r->spirv.iddecl);
+            output_u32(ctx, SpvStorageClassOutput);
+            pop_output(ctx);
+
+            output_spvname(ctx, r->spirv.iddecl, varname);
+        } // else if
+
+        else
+        {
+            fail(ctx, "unknown vertex shader attribute register");
+        } // else
+    } // if
+
+    else if (shader_is_pixel(ctx))
+    {
+        // samplers DCLs get handled in emit_SPIRV_sampler().
+
+        if (flags & MOD_CENTROID)  // !!! FIXME
+        {
+            failf(ctx, "centroid unsupported in %s profile", ctx->profile->name);
+            return;
+        } // if
+
+        switch (regtype) {
+            case REG_TYPE_COLOROUT:
+                push_output(ctx, &ctx->mainline_intro);
+                tid = spv_getptrvec4o(ctx);
+
+                output_spvop(ctx, SpvOpVariable, 4);
+                output_u32(ctx, tid);
+                output_u32(ctx, r->spirv.iddecl);
+                output_u32(ctx, SpvStorageClassOutput);
+                pop_output(ctx);
+
+                output_spvname(ctx, r->spirv.iddecl, varname);
+
+                break;
+            case REG_TYPE_DEPTHOUT:
+                // maps to BuiltIn FragDepth
+                push_output(ctx, &ctx->mainline_intro);
+                tid = spv_getptrfloato(ctx);
+
+                output_spvop(ctx, SpvOpVariable, 4);
+                output_u32(ctx, tid);
+                output_u32(ctx, r->spirv.iddecl);
+                output_u32(ctx, SpvStorageClassOutput);
+                pop_output(ctx);
+
+                output_spvname(ctx, r->spirv.iddecl, varname);
+                output_spvbuiltin(ctx, r->spirv.iddecl, SpvBuiltInFragDepth);
+
+                break;
+            case REG_TYPE_TEXTURE:
+            case REG_TYPE_INPUT:
+            case REG_TYPE_MISCTYPE:
+                push_output(ctx, &ctx->mainline_intro);
+                tid = spv_getptrvec4i(ctx);
+
+                output_spvop(ctx, SpvOpVariable, 4);
+                output_u32(ctx, tid);
+                output_u32(ctx, r->spirv.iddecl);
+                output_u32(ctx, SpvStorageClassInput);
+                pop_output(ctx);
+
+                output_spvname(ctx, r->spirv.iddecl, varname);
+
+                break;
+            default:
+                fail(ctx, "unknown pixel shader attribute register");
+        }
+    } // else if
+
+    else
+    {
+        fail(ctx, "Unknown shader type");  // state machine should catch this.
+    } // else
+
+} // emit_SPIRV_attribute
+
+static void emit_SPIRV_finalize(Context *ctx)
+{
+    /* The generator's magic number, this could be registered with Khronos
+     * if we wanted to. 0 is fine though, so use that for now. */
+    uint32 genmagic = 0x00000000;
+
+    /* Close main() */
+    output_spvop(ctx, SpvOpReturn, 1);
+    output_spvop(ctx, SpvOpFunctionEnd, 1);
+
+    push_output(ctx, &ctx->preflight);
+
+    output_u32(ctx, SpvMagicNumber);
+    output_u32(ctx, SpvVersion);
+    output_u32(ctx, genmagic);
+    output_u32(ctx, ctx->spirv.idmax);
+    output_u32(ctx, 0);
+
+    output_spvop(ctx, SpvOpCapability, 2);
+    output_u32(ctx, SpvCapabilityShader);
+
+    // only non-zero when actually needed
+    if (ctx->spirv.idext)
+    {
+        const char *extstr = "GLSL.std.450";
+        output_spvop(ctx, SpvOpExtInstImport, 2 + spv_strlen(extstr));
+        output_u32(ctx, ctx->spirv.idext);
+        output_spvstr(ctx, extstr);
+    } // if
+
+    output_spvop(ctx, SpvOpMemoryModel, 3);
+    output_u32(ctx, SpvAddressingModelLogical);
+    output_u32(ctx, SpvMemoryModelSimple);
+
+    /* 3 is for opcode + exec. model + idmain */
+    output_spvop(ctx, SpvOpEntryPoint, 3 + spv_strlen(ctx->mainfn) + ctx->spirv.inoutcount);
+    if (shader_is_vertex(ctx))
+    {
+        output_u32(ctx, SpvExecutionModelVertex);
+    } // if
+    else if (shader_is_pixel(ctx))
+    {
+        output_u32(ctx, SpvExecutionModelFragment);
+    } // else if
+    output_u32(ctx, ctx->spirv.idmain);
+    output_spvstr(ctx, ctx->mainfn);
+    // attributes
+    {
+        char varname[64];
+        RegisterList *p = &ctx->attributes, *r = NULL;
+
+        // !!! FIXME: The first element of the list is always empty and I don't know why!
+        p = p->next;
+        while (p) {
+            r = spv_getreg(ctx, p->regtype, p->regnum);
+            get_SPIRV_varname_in_buf(ctx, p->regtype, p->regnum, varname, sizeof (varname));
+            if (r) {
+                //fprintf(stderr, "r=%s, p_id=%u, r_id=%u\n", varname, p->spirv.iddecl, r->spirv.iddecl);
+                if (r->spirv.iddecl) {
+                    output_u32(ctx, r->spirv.iddecl);
+                } else {
+                    failf(ctx, "attribute register %s has id 0", varname);
+                }
+            } else {
+                failf(
+                    ctx,
+                    "missing attribute register %s (rt=%u, rn=%u, u=%u)",
+                    varname, p->regtype, p->regnum, p->usage
+                );
+            }
+            p = p->next;
+        }
+    }
+
+    // only applies to pixel shaders
+    if (shader_is_pixel(ctx))
+    {
+        output_spvop(ctx, SpvOpExecutionMode, 3);
+        output_u32(ctx, ctx->spirv.idmain);
+        output_u32(ctx, SpvExecutionModeOriginUpperLeft);
+    } // if
+
+    pop_output(ctx);
+} // emit_SPIRV_finalize
+
+static void emit_SPIRV_NOP(Context *ctx)
+{
+    // no-op is a no-op.  :)
+} // emit_SPIRV_NOP
+
+static void emit_SPIRV_ADD(Context *ctx)
+{
+    RegisterList *lr, *rr;
+    uint32 lid, rid;
+    lr = spv_getreg(ctx, ctx->source_args[0].regtype, ctx->source_args[0].regnum);
+    rr = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
+    if (lr == NULL || rr == NULL) { failf(ctx, "lr == NULL || rr == NULL"); }
+} // emit_SPIRV_ADD
+
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MUL)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP3)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP4)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MIN)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAX)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGE)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOG)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LIT)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DST)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LRP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(FRC)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X4)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X3)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X4)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X3)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X2)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CALL)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CALLNZ)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOOP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RET)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDLOOP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LABEL)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DCL)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(POW)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CRS)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGN)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ABS)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(NRM)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SINCOS)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(REP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDREP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(IF)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(IFC)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ELSE)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDIF)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAK)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAKC)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOVA)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFB)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFI)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RESERVED)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXCRD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXKILL)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXLD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXBEM)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXBEML)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXREG2AR)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXREG2GB)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X2PAD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X2TEX)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3PAD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3TEX)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3SPEC)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3VSPEC)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXPP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOGP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CND)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEF)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXREG2RGB)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXDP3TEX)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X2DEPTH)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXDP3)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXDEPTH)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CMP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BEM)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP2ADD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DSX)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DSY)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXLDD)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SETP)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXLDL)
+EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAKP)
+
+#endif  // SUPPORT_PROFILE_SPIRV
 
 #if !AT_LEAST_ONE_PROFILE
 #error No profiles are supported. Fix your build.
@@ -8592,6 +9327,9 @@ static const Profile profiles[] =
 #if SUPPORT_PROFILE_METAL
     DEFINE_PROFILE(METAL)
 #endif
+#if SUPPORT_PROFILE_SPIRV
+    DEFINE_PROFILE(SPIRV)
+#endif
 };
 
 #undef DEFINE_PROFILE
@@ -8614,6 +9352,7 @@ static const struct { const char *from; const char *to; } profileMap[] =
      PROFILE_EMITTER_GLSL(op) \
      PROFILE_EMITTER_ARB1(op) \
      PROFILE_EMITTER_METAL(op) \
+     PROFILE_EMITTER_SPIRV(op) \
 }
 
 static int parse_destination_token(Context *ctx, DestArgInfo *info)
@@ -12088,6 +12827,7 @@ int MOJOSHADER_maxShaderModel(const char *profile)
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_NV3, 2);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_NV4, 3);
     PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_METAL, 3);
+    PROFILE_SHADER_MODEL(MOJOSHADER_PROFILE_SPIRV, 3);
     #undef PROFILE_SHADER_MODEL
     return -1;  // unknown profile?
 } // MOJOSHADER_maxShaderModel
