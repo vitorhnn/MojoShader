@@ -562,6 +562,7 @@ static RegisterList *reglist_insert(Context *ctx, RegisterList *prev,
         item->index = 0;
         item->writemask = 0;
         item->misc = 0;
+        item->written = 0;
         item->array = NULL;
         item->next = prev->next;
         prev->next = item;
