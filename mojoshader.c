@@ -9458,6 +9458,34 @@ static void emit_SPIRV_DEF(Context *ctx)
     pop_output(ctx);
 } // emit_SPIRV_DEF
 
+static void emit_SPIRV_DEFI(Context *ctx)
+{
+    RegisterList *rl;
+    uint32 val0, val1, val2, val3, idiv4;
+    const int *raw = (const float *) ctx->dwords;
+
+    rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
+    rl->spirv.iddecl = spv_bumpid(ctx);
+    rl->spirv.iduse = rl->spirv.iddecl;
+
+    val0 = spv_getscalari(ctx, raw[0]);
+    val1 = spv_getscalari(ctx, raw[1]);
+    val2 = spv_getscalari(ctx, raw[2]);
+    val3 = spv_getscalari(ctx, raw[3]);
+
+    idiv4 = spv_getivec4(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
+    output_spvop(ctx, SpvOpConstantComposite, 3 + 4);
+    output_u32(ctx, idiv4);
+    output_u32(ctx, rl->spirv.iddecl);
+    output_u32(ctx, val0);
+    output_u32(ctx, val1);
+    output_u32(ctx, val2);
+    output_u32(ctx, val3);
+    pop_output(ctx);
+} // emit_SPIRV_DEFI
+
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
@@ -9505,7 +9533,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAK)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAKC)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOVA)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFB)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFI)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFI)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RESERVED)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXCRD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXKILL)
