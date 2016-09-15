@@ -9018,7 +9018,7 @@ static uint32 spv_getscalari(Context *ctx, int v)
     cl->next = prev->next;
     prev->next = cl;
     cl->v.i = v;
-    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_FLOAT);
+    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_INT);
     return cl->id;
 } // spv_getscalari
 
@@ -9042,7 +9042,7 @@ static uint32 spv_getscalaru(Context *ctx, uint32 v)
     cl->next = prev->next;
     prev->next = cl;
     cl->v.u = v;
-    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_FLOAT);
+    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_UINT);
     return cl->id;
 } // spv_getscalaru
 
