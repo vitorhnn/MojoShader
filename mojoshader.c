@@ -8652,6 +8652,27 @@ static uint32 spv_loadreg(Context *ctx, RegisterList *r)
     failf(ctx, "function %s not implemented", __func__);
 } // spv_loadreg
 
+static void componentlist_free(Context *ctx, ComponentList *cl)
+{
+    ComponentList *next;
+    while (cl)
+    {
+        next = cl->next;
+        Free(ctx, cl);
+        cl = next;
+    } // while
+} // componentlist_free
+
+static ComponentList *componentlist_alloc(Context *ctx)
+{
+    ComponentList *ret = (ComponentList *) Malloc(ctx, sizeof(ComponentList));
+    if (!ret) return NULL;
+    ret->id = 0;
+    ret->v.i = 0;
+    ret->next = NULL;
+    return ret;
+}
+
 static const char *get_SPIRV_varname_in_buf(Context *ctx, const RegisterType rt,
                                            const int regnum, char *buf,
                                            const size_t buflen)
@@ -8922,6 +8943,109 @@ static uint32 spv_getext(Context *ctx)
     return ctx->spirv.idext = spv_bumpid(ctx);
 } // spv_getext
 
+static uint32 spv_emitscalar(Context *ctx, ComponentList *cl,
+                             MOJOSHADER_attributeType type)
+{
+    uint32 idret, idtype;
+    if (type == MOJOSHADER_ATTRIBUTE_FLOAT)
+    {
+        idtype = spv_getfloat(ctx);
+    } // if
+    else if (type == MOJOSHADER_ATTRIBUTE_INT)
+    {
+        idtype = spv_getint(ctx);
+    } // else if
+    else if (type == MOJOSHADER_ATTRIBUTE_UINT)
+    {
+        idtype = spv_getuint(ctx);
+    } // else if
+    else
+    {
+        failf(ctx, "%s: invalid attribute type %d", __func__, type);
+        return 0;
+    }
+    idret = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpConstant, 4);
+    output_u32(ctx, idtype);
+    output_u32(ctx, idret);
+    output_u32(ctx, cl->v.u);
+    return idret;
+} // spv_emitscalar
+
+// The spv_getscalar* functions retrieve the result id of an OpConstant
+// instruction with the corresponding value v, or generate a new one.
+static uint32 spv_getscalarf(Context *ctx, float v)
+{
+    ComponentList *prev = &(ctx->spirv.cl.f), *cl = ctx->spirv.cl.f.next;
+    while (cl)
+    {
+        if (v == cl->v.f)
+        {
+            return cl->id;
+        } // if
+        else if (v < cl->v.f)
+        {
+            break;
+        } // else if
+        prev = cl;
+        cl = cl->next;
+    } // while
+    cl = componentlist_alloc(ctx);
+    cl->next = prev->next;
+    prev->next = cl;
+    cl->v.f = v;
+    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_FLOAT);
+    return cl->id;
+} // spv_getscalarf
+
+static uint32 spv_getscalari(Context *ctx, int v)
+{
+    ComponentList *prev = &(ctx->spirv.cl.i), *cl = ctx->spirv.cl.i.next;
+    while (cl)
+    {
+        if (v == cl->v.i)
+        {
+            return cl->id;
+        } // if
+        else if (v < cl->v.i)
+        {
+            break;
+        } // else if
+        prev = cl;
+        cl = cl->next;
+    } // while
+    cl = componentlist_alloc(ctx);
+    cl->next = prev->next;
+    prev->next = cl;
+    cl->v.i = v;
+    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_FLOAT);
+    return cl->id;
+} // spv_getscalari
+
+static uint32 spv_getscalaru(Context *ctx, uint32 v)
+{
+    ComponentList *prev = &(ctx->spirv.cl.u), *cl = ctx->spirv.cl.u.next;
+    while (cl)
+    {
+        if (v == cl->v.u)
+        {
+            return cl->id;
+        } // if
+        else if (v < cl->v.u)
+        {
+            break;
+        } // else if
+        prev = cl;
+        cl = cl->next;
+    } // while
+    cl = componentlist_alloc(ctx);
+    cl->next = prev->next;
+    prev->next = cl;
+    cl->v.u = v;
+    cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_FLOAT);
+    return cl->id;
+} // spv_getscalaru
+
 static void emit_SPIRV_start(Context *ctx, const char *profilestr)
 {
     if (!(
@@ -8987,6 +9111,7 @@ static void emit_SPIRV_phase(Context *ctx){
 
 static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum){}
 static void emit_SPIRV_array(Context *ctx, VariableList *var){}
+
 static void emit_SPIRV_const_array(Context *ctx,
                                    const struct ConstantsList *constslist,
                                    int base, int size){}
@@ -9232,6 +9357,28 @@ static void emit_SPIRV_finalize(Context *ctx)
     } // if
 
     pop_output(ctx);
+
+    {
+        ComponentList *cl = &ctx->spirv.cl.f;
+        while (cl) {
+            fprintf(stderr, "cl.f:%p v:%f id:%u next:%p\n", cl, cl->v.f, cl->id, cl->next);
+            cl = cl->next;
+        }
+        cl = &ctx->spirv.cl.i;
+        while (cl) {
+            fprintf(stderr, "cl.i:%p v:%d id:%u next:%p\n", cl, cl->v.i, cl->id, cl->next);
+            cl = cl->next;
+        }
+        cl = &ctx->spirv.cl.u;
+        while (cl) {
+            fprintf(stderr, "cl.u:%p v:%u id:%u next:%p\n", cl, cl->v.u, cl->id, cl->next);
+            cl = cl->next;
+        }
+    }
+
+    componentlist_free(ctx, ctx->spirv.cl.f.next);
+    componentlist_free(ctx, ctx->spirv.cl.i.next);
+    componentlist_free(ctx, ctx->spirv.cl.u.next);
 } // emit_SPIRV_finalize
 
 static void emit_SPIRV_NOP(Context *ctx)
@@ -9246,8 +9393,41 @@ static void emit_SPIRV_ADD(Context *ctx)
     lr = spv_getreg(ctx, ctx->source_args[0].regtype, ctx->source_args[0].regnum);
     rr = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
     if (lr == NULL || rr == NULL) { failf(ctx, "lr == NULL || rr == NULL"); }
-    fprintf(stderr, "%s: lr=t:%u,n:%d rr=t:%u,n:%d\n", __func__, lr->regtype, lr->regnum, rr->regtype, rr->regnum);
+    {
+        char l[3];
+        char r[3];
+        const char *lt, *rt;
+        lt = get_D3D_register_string(ctx, lr->regtype, lr->regnum, l, sizeof(l));
+        rt = get_D3D_register_string(ctx, rr->regtype, rr->regnum, r, sizeof(r));
+        fprintf(stderr, "%s: lr=%s%s rr=%s%s\n", __func__, lt, l, rt, r);
+    }
 } // emit_SPIRV_ADD
+
+static void emit_SPIRV_DEF(Context *ctx)
+{
+    RegisterList *rl;
+    uint32 val0, val1, val2, val3, idv4;
+    const float *raw = (const float *) ctx->dwords;
+
+    rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
+    rl->spirv.iddecl = spv_bumpid(ctx);
+    rl->spirv.iduse = rl->spirv.iddecl;
+
+    val0 = spv_getscalarf(ctx, raw[0]);
+    val1 = spv_getscalarf(ctx, raw[1]);
+    val2 = spv_getscalarf(ctx, raw[2]);
+    val3 = spv_getscalarf(ctx, raw[3]);
+
+    idv4 = spv_getvec4(ctx);
+
+    output_spvop(ctx, SpvOpConstantComposite, 3 + 4);
+    output_u32(ctx, idv4);
+    output_u32(ctx, rl->spirv.iddecl);
+    output_u32(ctx, val0);
+    output_u32(ctx, val1);
+    output_u32(ctx, val2);
+    output_u32(ctx, val3);
+} // emit_SPIRV_DEF
 
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
@@ -9314,7 +9494,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3VSPEC)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXPP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOGP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CND)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEF)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEF)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXREG2RGB)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXDP3TEX)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X2DEPTH)
