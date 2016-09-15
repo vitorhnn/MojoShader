@@ -8939,10 +8939,12 @@ static uint32 spv_getivec4(Context *ctx)
         } \
         fid = spv_get ## _from(ctx); \
         id = spv_bumpid(ctx); \
+        push_output(ctx, &ctx->mainline_intro); \
         output_spvop(ctx, SpvOpTypePointer, 4); \
         output_u32(ctx, id); \
         output_u32(ctx, SpvStorageClass ## _storageclass); \
         output_u32(ctx, fid); \
+        pop_output(ctx); \
         return ctx->spirv.types.id ## _var = id; \
     }
 
