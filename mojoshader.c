@@ -8790,8 +8790,11 @@ static uint32 spv_getvoid(Context *ctx)
     } // if
 
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeVoid, 2);
     output_u32(ctx, id);
+    pop_output(ctx);
     return ctx->spirv.types.idvoid = id;
 } // spv_getvoid
 
@@ -8805,9 +8808,12 @@ static uint32 spv_getfuncv(Context *ctx)
 
     vid = spv_getvoid(ctx);
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeFunction, 3);
     output_u32(ctx, id);
     output_u32(ctx, vid);
+    pop_output(ctx);
     return ctx->spirv.types.idfuncv = id;
 } // spv_getfuncv
 
@@ -8820,8 +8826,11 @@ static uint32 spv_getbool(Context *ctx)
     } // if
 
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeBool, 2);
     output_u32(ctx, id);
+    pop_output(ctx);
     return ctx->spirv.types.idbool = id;
 } // spv_getbool
 
@@ -8834,9 +8843,12 @@ static uint32 spv_getfloat(Context *ctx)
     } // if
 
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeFloat, 3);
     output_u32(ctx, id);
     output_u32(ctx, 32);
+    pop_output(ctx);
     return ctx->spirv.types.idfloat = id;
 } // spv_getfloat
 
@@ -8849,10 +8861,13 @@ static uint32 spv_getint(Context *ctx)
     } // if
 
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeInt, 4);
     output_u32(ctx, id);
     output_u32(ctx, 32);
     output_u32(ctx, 1);
+    pop_output(ctx);
     return ctx->spirv.types.idint = id;
 } // spv_getint
 
@@ -8865,10 +8880,13 @@ static uint32 spv_getuint(Context *ctx)
     } // if
 
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeInt, 4);
     output_u32(ctx, id);
     output_u32(ctx, 32);
     output_u32(ctx, 0);
+    pop_output(ctx);
     return ctx->spirv.types.iduint = id;
 } // spv_getint
 
@@ -8882,10 +8900,13 @@ static uint32 spv_getvec4(Context *ctx)
 
     fid = spv_getfloat(ctx);
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeVector, 4);
     output_u32(ctx, id);
     output_u32(ctx, fid);
     output_u32(ctx, 4);
+    pop_output(ctx);
     return ctx->spirv.types.idvec4 = id;
 } // spv_getvec4
 
@@ -8899,10 +8920,13 @@ static uint32 spv_getivec4(Context *ctx)
 
     iid = spv_getint(ctx);
     id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpTypeVector, 4);
     output_u32(ctx, id);
     output_u32(ctx, iid);
     output_u32(ctx, 4);
+    pop_output(ctx);
     return ctx->spirv.types.idivec4 = id;
 } // spv_getvec4i
 
@@ -8965,10 +8989,13 @@ static uint32 spv_emitscalar(Context *ctx, ComponentList *cl,
         return 0;
     }
     idret = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpConstant, 4);
     output_u32(ctx, idtype);
     output_u32(ctx, idret);
     output_u32(ctx, cl->v.u);
+    pop_output(ctx);
     return idret;
 } // spv_emitscalar
 
@@ -9420,6 +9447,7 @@ static void emit_SPIRV_DEF(Context *ctx)
 
     idv4 = spv_getvec4(ctx);
 
+    push_output(ctx, &ctx->mainline_intro);
     output_spvop(ctx, SpvOpConstantComposite, 3 + 4);
     output_u32(ctx, idv4);
     output_u32(ctx, rl->spirv.iddecl);
@@ -9427,6 +9455,7 @@ static void emit_SPIRV_DEF(Context *ctx)
     output_u32(ctx, val1);
     output_u32(ctx, val2);
     output_u32(ctx, val3);
+    pop_output(ctx);
 } // emit_SPIRV_DEF
 
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
