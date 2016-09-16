@@ -238,6 +238,8 @@ typedef struct Context
             uint32 idvoid;
             uint32 idfuncv;
             uint32 idbool;
+            uint32 idtrue;
+            uint32 idfalse;
             uint32 idfloat;
             uint32 idint;
             uint32 iduint;
@@ -8834,6 +8836,44 @@ static uint32 spv_getbool(Context *ctx)
     return ctx->spirv.types.idbool = id;
 } // spv_getbool
 
+static uint32 spv_gettrue(Context *ctx)
+{
+    uint32 id, bid;
+    if (ctx->spirv.types.idtrue)
+    {
+        return ctx->spirv.types.idtrue;
+    } // if
+
+    bid = spv_getbool(ctx);
+    id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
+    output_spvop(ctx, SpvOpConstantTrue, 3);
+    output_u32(ctx, bid);
+    output_u32(ctx, id);
+    pop_output(ctx);
+    return ctx->spirv.types.idtrue = id;
+} // spv_gettrue
+
+static uint32 spv_getfalse(Context *ctx)
+{
+    uint32 id, bid;
+    if (ctx->spirv.types.idfalse)
+    {
+        return ctx->spirv.types.idfalse;
+    } // if
+
+    bid = spv_getbool(ctx);
+    id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
+    output_spvop(ctx, SpvOpConstantFalse, 3);
+    output_u32(ctx, bid);
+    output_u32(ctx, id);
+    pop_output(ctx);
+    return ctx->spirv.types.idfalse = id;
+} // spv_getfalse
+
 static uint32 spv_getfloat(Context *ctx)
 {
     uint32 id;
@@ -9488,6 +9528,15 @@ static void emit_SPIRV_DEFI(Context *ctx)
     pop_output(ctx);
 } // emit_SPIRV_DEFI
 
+static void emit_SPIRV_DEFB(Context *ctx)
+{
+    RegisterList *rl;
+
+    rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
+    rl->spirv.iddecl = ctx->dwords[0] ? spv_gettrue(ctx) : spv_getfalse(ctx);
+    rl->spirv.iduse = rl->spirv.iddecl;
+} // emit_SPIRV_DEFB
+
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
@@ -9534,7 +9583,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDIF)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAK)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAKC)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOVA)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFB)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFB)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFI)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RESERVED)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXCRD)
