@@ -9503,7 +9503,7 @@ static void emit_SPIRV_DEFI(Context *ctx)
     RegisterList *rl;
     uint32 val0, val1, val2, val3, idiv4;
     char varname[64];
-    const int *raw = (const float *) ctx->dwords;
+    const int *raw = (const int *) ctx->dwords;
 
     rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
     rl->spirv.iddecl = spv_bumpid(ctx);
