@@ -9033,8 +9033,9 @@ static int parse_source_token(Context *ctx, SourceArgInfo *info)
         case SRCMOD_NOT:  // !!! FIXME: I _think_ this is right...
             if (shader_version_atleast(ctx, 2, 0))
             {
-                if (info->regtype != REG_TYPE_PREDICATE)
-                    fail(ctx, "NOT only allowed on predicate register.");
+                if (info->regtype != REG_TYPE_PREDICATE
+                 && info->regtype != REG_TYPE_CONSTBOOL)
+                    fail(ctx, "NOT only allowed on bool registers.");
             } // if
             break;
 
