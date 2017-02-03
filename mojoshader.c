@@ -10687,6 +10687,13 @@ static void parse_preshader(Context *ctx, const uint32 *tokens, uint32 tokcount)
         if ( (!is_comment_token(ctx, *tokens, &subtokcount)) ||
              (subtokcount > tokcount) )
         {
+            // !!! FIXME: Standalone preshaders have this EOS-looking token,
+            // !!! FIXME:  sometimes followed by tokens that don't appear to
+            // !!! FIXME:  have anything to do with the rest of the blob.
+            // !!! FIXME: So for now, treat this as a special "EOS" comment.
+            if (SWAP32(*tokens) == 0xFFFF)
+                break;
+
             fail(ctx, "Bogus preshader data.");
             return;
         } // if
