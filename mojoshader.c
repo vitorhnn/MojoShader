@@ -2289,10 +2289,6 @@ static void emit_GLSL_start(Context *ctx, const char *profilestr)
         else
             output_line(ctx, "precision mediump float;");
         output_line(ctx, "precision mediump int;");
-        // Some drivers don't like it when the precision varies between shaders. -ade
-        output_line(ctx, "varying highp vec4 v_FrontColor;");
-        output_line(ctx, "varying highp vec4 v_FrontSecondaryColor;");
-        output_line(ctx, "varying highp vec4 v_TexCoord[10];"); // 10 according to SM3
         pop_output(ctx);
     } // else if
     #endif
@@ -2411,9 +2407,10 @@ static void emit_GLSL_global(Context *ctx, RegisterType regtype, int regnum)
                 if (!shader_version_atleast(ctx, 1, 4))
                 {
 #if SUPPORT_PROFILE_GLSLES
+                    // GLSL ES does not have gl_TexCoord
                     if (support_glsles(ctx))
-                        output_line(ctx, "vec4 %s = v_TexCoord[%d];",
-                                    varname, regnum);
+                        output_line(ctx, "vec4 %s = io_%i_%i;",
+                                    varname, MOJOSHADER_USAGE_TEXCOORD, regnum);
                     else
 #endif
                     output_line(ctx, "vec4 %s = gl_TexCoord[%d];",
@@ -2676,23 +2673,17 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                     usage_str = "gl_PointSize";
                     break;
                 case MOJOSHADER_USAGE_COLOR:
+#if SUPPORT_PROFILE_GLSLES
+                    if (support_glsles(ctx))
+                        break; // GLSL ES does not have gl_FrontColor
+#endif
                     index_str[0] = '\0';  // no explicit number.
                     if (index == 0)
                     {
-#if SUPPORT_PROFILE_GLSLES
-                        if (support_glsles(ctx))
-                            usage_str = "v_FrontColor";
-                        else
-#endif
                         usage_str = "gl_FrontColor";
                     } // if
                     else if (index == 1)
                     {
-#if SUPPORT_PROFILE_GLSLES
-                        if (support_glsles(ctx))
-                            usage_str = "v_FrontSecondaryColor";
-                        else
-#endif
                         usage_str = "gl_FrontSecondaryColor";
                     } // else if
                     break;
@@ -2700,12 +2691,11 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                     usage_str = "gl_FogFragCoord";
                     break;
                 case MOJOSHADER_USAGE_TEXCOORD:
-                    snprintf(index_str, sizeof (index_str), "%u", (uint) index);
 #if SUPPORT_PROFILE_GLSLES
                     if (support_glsles(ctx))
-                        usage_str = "v_TexCoord";
-                    else
+                        break; // GLSL ES does not have gl_TexCoord
 #endif
+                    snprintf(index_str, sizeof (index_str), "%u", (uint) index);
                     usage_str = "gl_TexCoord";
                     arrayleft = "[";
                     arrayright = "]";
@@ -2772,6 +2762,10 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
         // !!! FIXME: can you actualy have a texture register with COLOR usage?
         else if ((regtype == REG_TYPE_TEXTURE) || (regtype == REG_TYPE_INPUT))
         {
+#if SUPPORT_PROFILE_GLSLES
+            if (!support_glsles(ctx))
+            {
+#endif
             if (usage == MOJOSHADER_USAGE_TEXCOORD)
             {
                 // ps_1_1 does a different hack for this attribute.
@@ -2779,11 +2773,6 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                 if (shader_version_atleast(ctx, 1, 4))
                 {
                     snprintf(index_str, sizeof (index_str), "%u", (uint) index);
-#if SUPPORT_PROFILE_GLSLES
-                    if (support_glsles(ctx))
-                        usage_str = "v_TexCoord";
-                    else
-#endif
                     usage_str = "gl_TexCoord";
                     arrayleft = "[";
                     arrayright = "]";
@@ -2795,26 +2784,19 @@ static void emit_GLSL_attribute(Context *ctx, RegisterType regtype, int regnum,
                 index_str[0] = '\0';  // no explicit number.
                 if (index == 0)
                 {
-#if SUPPORT_PROFILE_GLSLES
-                    if (support_glsles(ctx))
-                        usage_str = "v_FrontColor";
-                    else
-#endif
                     usage_str = "gl_Color";
                 } // if
                 else if (index == 1)
                 {
-#if SUPPORT_PROFILE_GLSLES
-                    if (support_glsles(ctx))
-                        usage_str = "v_FrontSecondaryColor";
-                    else
-#endif
                     usage_str = "gl_SecondaryColor";
                 } // else if
                 // FIXME: Does this even matter when we have varyings? -flibit
                 // else
                 //    fail(ctx, "unsupported color index");
             } // else if
+#if SUPPORT_PROFILE_GLSLES
+            } // if
+#endif
         } // else if
 
         else if (regtype == REG_TYPE_MISCTYPE)
@@ -10110,8 +10092,9 @@ static int parse_source_token(Context *ctx, SourceArgInfo *info)
         case SRCMOD_NOT:  // !!! FIXME: I _think_ this is right...
             if (shader_version_atleast(ctx, 2, 0))
             {
-                if (info->regtype != REG_TYPE_PREDICATE)
-                    fail(ctx, "NOT only allowed on predicate register.");
+                if (info->regtype != REG_TYPE_PREDICATE
+                 && info->regtype != REG_TYPE_CONSTBOOL)
+                    fail(ctx, "NOT only allowed on bool registers.");
             } // if
             break;
 
@@ -10816,9 +10799,10 @@ static void check_call_loop_wrappage(Context *ctx, const int regnum)
 
     const int current_usage = (ctx->loops > 0) ? 1 : -1;
     RegisterList *reg = reglist_find(&ctx->used_registers, REG_TYPE_LABEL, regnum);
-    assert(reg != NULL);
 
-    if (reg->misc == 0)
+    if (reg == NULL)
+        fail(ctx, "Invalid label for CALL");
+    else if (reg->misc == 0)
         reg->misc = current_usage;
     else if (reg->misc != current_usage)
     {
@@ -11519,9 +11503,10 @@ static int parse_ctab_string(const uint8 *start, const uint32 bytes,
 
 static int parse_ctab_typeinfo(Context *ctx, const uint8 *start,
                                const uint32 bytes, const uint32 pos,
-                               MOJOSHADER_symbolTypeInfo *info)
+                               MOJOSHADER_symbolTypeInfo *info,
+                               const int depth)
 {
-    if ((pos + 16) >= bytes)
+    if ((bytes <= pos) || ((bytes - pos) < 16))
         return 0;  // corrupt CTAB.
 
     const uint16 *typeptr = (const uint16 *) (start + pos);
@@ -11531,26 +11516,45 @@ static int parse_ctab_typeinfo(Context *ctx, const uint8 *start,
     info->rows = (unsigned int) SWAP16(typeptr[2]);
     info->columns = (unsigned int) SWAP16(typeptr[3]);
     info->elements = (unsigned int) SWAP16(typeptr[4]);
-    info->member_count = (unsigned int) SWAP16(typeptr[5]);
 
-    if ((pos + 16 + (info->member_count * 8)) >= bytes)
+    if (info->parameter_class >= MOJOSHADER_SYMCLASS_TOTAL)
+    {
+        failf(ctx, "Unknown parameter class (0x%X)", info->parameter_class);
+        info->parameter_class = MOJOSHADER_SYMCLASS_SCALAR;
+    } // if
+
+    if (info->parameter_type >= MOJOSHADER_SYMTYPE_TOTAL)
+    {
+        failf(ctx, "Unknown parameter type (0x%X)", info->parameter_type);
+        info->parameter_type = MOJOSHADER_SYMTYPE_INT;
+    } // if
+
+    const unsigned int member_count = (unsigned int) SWAP16(typeptr[5]);
+    info->member_count = 0;
+    info->members = NULL;
+
+    if ((pos + 16 + (member_count * 8)) >= bytes)
         return 0;  // corrupt CTAB.
 
-    if (info->member_count == 0)
-        info->members = NULL;
-    else
+    if (member_count > 0)
     {
-        const size_t len = sizeof (MOJOSHADER_symbolStructMember) *
-                            info->member_count;
+        if (depth > 300)  // make sure we aren't in an infinite loop here.
+        {
+            fail(ctx, "Possible infinite loop in CTAB structure.");
+            return 0;
+        } // if
+
+        const size_t len = sizeof (MOJOSHADER_symbolStructMember) * member_count;
         info->members = (MOJOSHADER_symbolStructMember *) Malloc(ctx, len);
         if (info->members == NULL)
             return 1;  // we'll check ctx->out_of_memory later.
         memset(info->members, '\0', len);
+        info->member_count = member_count;
     } // else
 
     unsigned int i;
     const uint32 *member = (const uint32 *) (start + typeptr[6]);
-    for (i = 0; i < info->member_count; i++)
+    for (i = 0; i < member_count; i++)
     {
         MOJOSHADER_symbolStructMember *mbr = &info->members[i];
         const uint32 name = SWAP32(member[0]);
@@ -11563,7 +11567,7 @@ static int parse_ctab_typeinfo(Context *ctx, const uint8 *start,
         mbr->name = StrDup(ctx, (const char *) (start + name));
         if (mbr->name == NULL)
             return 1;  // we'll check ctx->out_of_memory later.
-        if (!parse_ctab_typeinfo(ctx, start, bytes, memberinfopos, &mbr->info))
+        if (!parse_ctab_typeinfo(ctx, start, bytes, memberinfopos, &mbr->info, depth + 1))
             return 0;
         if (ctx->out_of_memory)
             return 1;  // drop out now.
@@ -11586,7 +11590,12 @@ static void parse_constant_table(Context *ctx, const uint32 *tokens,
     if (id != CTAB_ID)
         return;  // not the constant table.
 
-    assert(ctab->have_ctab == 0);  // !!! FIXME: can you have more than one?
+    if (ctab->have_ctab)  // !!! FIXME: can you have more than one?
+    {
+        fail(ctx, "Shader has multiple CTAB sections");
+        return;
+    } // if
+
     ctab->have_ctab = 1;
 
     const uint8 *start = (uint8 *) &tokens[2];
@@ -11606,19 +11615,26 @@ static void parse_constant_table(Context *ctx, const uint32 *tokens,
 
     if (size != CTAB_SIZE)
         goto corrupt_ctab;
+    else if (constants > 1000000)  // sanity check.
+        goto corrupt_ctab;
 
     if (version != okay_version) goto corrupt_ctab;
     if (creator >= bytes) goto corrupt_ctab;
-    if ((constantinfo + (constants * CINFO_SIZE)) >= bytes) goto corrupt_ctab;
+    if (constantinfo >= bytes) goto corrupt_ctab;
+    if ((bytes - constantinfo) < (constants * CINFO_SIZE)) goto corrupt_ctab;
     if (target >= bytes) goto corrupt_ctab;
     if (!parse_ctab_string(start, bytes, target)) goto corrupt_ctab;
     // !!! FIXME: check that (start+target) points to "ps_3_0", etc.
 
+    ctab->symbols = NULL;
+    if (constants > 0)
+    {
+        ctab->symbols = (MOJOSHADER_symbol *) Malloc(ctx, sizeof (MOJOSHADER_symbol) * constants);
+        if (ctab->symbols == NULL)
+            return;
+        memset(ctab->symbols, '\0', sizeof (MOJOSHADER_symbol) * constants);
+    } // if
     ctab->symbol_count = constants;
-    ctab->symbols = (MOJOSHADER_symbol *) Malloc(ctx, sizeof (MOJOSHADER_symbol) * constants);
-    if (ctab->symbols == NULL)
-        return;
-    memset(ctab->symbols, '\0', sizeof (MOJOSHADER_symbol) * constants);
 
     uint32 i = 0;
     for (i = 0; i < constants; i++)
@@ -11671,7 +11687,7 @@ static void parse_constant_table(Context *ctx, const uint32 *tokens,
         sym->register_set = (MOJOSHADER_symbolRegisterSet) regset;
         sym->register_index = (unsigned int) regidx;
         sym->register_count = (unsigned int) regcnt;
-        if (!parse_ctab_typeinfo(ctx, start, bytes, typeinf, &sym->info))
+        if (!parse_ctab_typeinfo(ctx, start, bytes, typeinf, &sym->info, 0))
             goto corrupt_ctab;  // sym->name will get free()'d later.
         else if (ctx->out_of_memory)
             return;  // just bail now.
@@ -11763,6 +11779,13 @@ static void parse_preshader(Context *ctx, const uint32 *tokens, uint32 tokcount)
         if ( (!is_comment_token(ctx, *tokens, &subtokcount)) ||
              (subtokcount > tokcount) )
         {
+            // !!! FIXME: Standalone preshaders have this EOS-looking token,
+            // !!! FIXME:  sometimes followed by tokens that don't appear to
+            // !!! FIXME:  have anything to do with the rest of the blob.
+            // !!! FIXME: So for now, treat this as a special "EOS" comment.
+            if (SWAP32(*tokens) == 0xFFFF)
+                break;
+
             fail(ctx, "Bogus preshader data.");
             return;
         } // if
@@ -12895,8 +12918,8 @@ static void process_definitions(Context *ctx)
             {
                 ctx->profile->array_emitter(ctx, var);
                 ctx->uniform_float4_count += var->count;
-                ctx->uniform_count++;
             } // else
+            ctx->uniform_count++;
         } // if
     } // for
 
