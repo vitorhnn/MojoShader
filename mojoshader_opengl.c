@@ -2748,7 +2748,6 @@ void MOJOSHADER_glDeleteEffect(MOJOSHADER_glEffect *glEffect)
         ctx->profileDeleteShader(glEffect->shaders[i].handle);
     } // for
 
-    f(glEffect->shaders, d);
     f(glEffect->shader_indices, d);
     f(glEffect->preshader_indices, d);
     f(glEffect, d);
