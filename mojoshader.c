@@ -9097,6 +9097,311 @@ static uint32 spv_getscalaru(Context *ctx, uint32 v)
     return cl->id;
 } // spv_getscalaru
 
+uint32 spv_swizzle(Context *ctx, uint32 arg, const int swizzle,
+                   const int writemask)
+{
+    // Nothing to do, so return the same SSA value
+    if (no_swizzle(swizzle) && writemask_xyzw(writemask)) {
+        return arg;
+    } // if
+
+    uint32 result = spv_bumpid(ctx);
+
+    const int writemask0 = (writemask >> 0) & 0x1;
+    const int writemask1 = (writemask >> 1) & 0x1;
+    const int writemask2 = (writemask >> 2) & 0x1;
+    const int writemask3 = (writemask >> 3) & 0x1;
+
+    const uint32 swizzle_x = (swizzle >> 0) & 0x3;
+    const uint32 swizzle_y = (swizzle >> 2) & 0x3;
+    const uint32 swizzle_z = (swizzle >> 4) & 0x3;
+    const uint32 swizzle_w = (swizzle >> 6) & 0x3;
+
+    uint32 vec4 = spv_getvec4(ctx);
+
+    push_output(ctx, &ctx->mainline);
+    output_spvop(ctx, SpvOpVectorShuffle, 5 + 4);
+    output_u32(ctx, vec4);
+    output_u32(ctx, result);
+    // OpVectorShuffle takes two vectors to shuffle, but to do a swizzle
+    // operation we can just ignore the second argument (meaning it can be
+    // anything, and I am just making it `arg` for convenience)
+    output_u32(ctx, arg);
+    output_u32(ctx, arg);
+
+    int i = 0;
+    if (writemask0) { output_u32(ctx, swizzle_x); i++; }
+    if (writemask1) { output_u32(ctx, swizzle_y); i++; }
+    if (writemask2) { output_u32(ctx, swizzle_z); i++; }
+    if (writemask3) { output_u32(ctx, swizzle_w); i++; }
+
+    // All remaining components are left undefined, indicated by a value of 0xFFFFFFFF
+    for (; i < 4; i++) {
+        output_u32(ctx, 0xFFFFFFFF);
+    }
+
+    pop_output(ctx);
+
+    return result;
+} // make_GLSL_swizzle_string
+
+static uint32 spv_load_srcarg(Context *ctx, const size_t idx, const int writemask)
+{
+    if (idx >= STATICARRAYLEN(ctx->source_args))
+    {
+        fail(ctx, "Too many source args");
+        return 0;
+    } // if
+
+    const SourceArgInfo *arg = &ctx->source_args[idx];
+
+    const RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
+    uint32 result = reg->spirv.iddecl;
+
+    result = spv_swizzle(ctx, result, arg->swizzle, writemask);
+
+//    const char *premod_str = "";
+//    const char *postmod_str = "";
+    switch (arg->src_mod)
+    {
+        case SRCMOD_NEGATE:
+        {
+            uint32 new_result = spv_bumpid(ctx);
+            uint32 vec4 = spv_getvec4(ctx);
+            push_output(ctx, &ctx->mainline);
+            output_spvop(ctx, SpvOpFNegate, 4);
+            output_u32(ctx, vec4);
+            output_u32(ctx, new_result);
+            output_u32(ctx, result);
+            pop_output(ctx);
+            result = new_result;
+            break;
+        }
+
+        default:
+            failf(ctx, "unsupported source modifier %d", arg->src_mod);
+            return 0;
+
+//        case SRCMOD_BIASNEGATE:
+//            premod_str = "-(";
+//            postmod_str = " - 0.5)";
+//            break;
+//
+//        case SRCMOD_BIAS:
+//            premod_str = "(";
+//            postmod_str = " - 0.5)";
+//            break;
+//
+//        case SRCMOD_SIGNNEGATE:
+//            premod_str = "-((";
+//            postmod_str = " - 0.5) * 2.0)";
+//            break;
+//
+//        case SRCMOD_SIGN:
+//            premod_str = "((";
+//            postmod_str = " - 0.5) * 2.0)";
+//            break;
+//
+//        case SRCMOD_COMPLEMENT:
+//            premod_str = "(1.0 - ";
+//            postmod_str = ")";
+//            break;
+//
+//        case SRCMOD_X2NEGATE:
+//            premod_str = "-(";
+//            postmod_str = " * 2.0)";
+//            break;
+//
+//        case SRCMOD_X2:
+//            premod_str = "(";
+//            postmod_str = " * 2.0)";
+//            break;
+//
+//        case SRCMOD_DZ:
+//            fail(ctx, "SRCMOD_DZ unsupported"); return buf; // !!! FIXME
+//            postmod_str = "_dz";
+//            break;
+//
+//        case SRCMOD_DW:
+//            fail(ctx, "SRCMOD_DW unsupported"); return buf; // !!! FIXME
+//            postmod_str = "_dw";
+//            break;
+//
+//        case SRCMOD_ABSNEGATE:
+//            premod_str = "-abs(";
+//            postmod_str = ")";
+//            break;
+//
+//        case SRCMOD_ABS:
+//            premod_str = "abs(";
+//            postmod_str = ")";
+//            break;
+//
+//        case SRCMOD_NOT:
+//            premod_str = "!";
+//            break;
+
+        case SRCMOD_NONE:
+        case SRCMOD_TOTAL:
+            break;  // stop compiler whining.
+    } // switch
+
+//    const char *regtype_str = NULL;
+
+//    if (!arg->relative)
+//    {
+//        regtype_str = get_GLSL_varname_in_buf(ctx, arg->regtype, arg->regnum,
+//                                              (char *) alloca(64), 64);
+//    } // if
+
+//    const char *rel_lbracket = "";
+//    char rel_offset[32] = { '\0' };
+//    const char *rel_rbracket = "";
+//    char rel_swizzle[4] = { '\0' };
+//    const char *rel_regtype_str = "";
+    if (arg->relative)
+    {
+        fail(ctx, "relative register access is unimplemented");
+//        if (arg->regtype == REG_TYPE_INPUT)
+//            regtype_str=get_GLSL_input_array_varname(ctx,(char*)alloca(64),64);
+//        else
+//        {
+//            assert(arg->regtype == REG_TYPE_CONST);
+//            const int arrayidx = arg->relative_array->index;
+//            const int offset = arg->regnum - arrayidx;
+//            assert(offset >= 0);
+//            if (arg->relative_array->constant)
+//            {
+//                const int arraysize = arg->relative_array->count;
+//                regtype_str = get_GLSL_const_array_varname_in_buf(ctx,
+//                                                                  arrayidx, arraysize, (char *) alloca(64), 64);
+//                if (offset != 0)
+//                    snprintf(rel_offset, sizeof (rel_offset), "%d + ", offset);
+//            } // if
+//            else
+//            {
+//                regtype_str = get_GLSL_uniform_array_varname(ctx, arg->regtype,
+//                                                             (char *) alloca(64), 64);
+//                if (offset == 0)
+//                {
+//                    snprintf(rel_offset, sizeof (rel_offset),
+//                             "ARRAYBASE_%d + ", arrayidx);
+//                } // if
+//                else
+//                {
+//                    snprintf(rel_offset, sizeof (rel_offset),
+//                             "(ARRAYBASE_%d + %d) + ", arrayidx, offset);
+//                } // else
+//            } // else
+//        } // else
+//
+//        rel_lbracket = "[";
+//
+//        rel_regtype_str = get_GLSL_varname_in_buf(ctx, arg->relative_regtype,
+//                                                  arg->relative_regnum,
+//                                                  (char *) alloca(64), 64);
+//        rel_swizzle[0] = '.';
+//        rel_swizzle[1] = swizzle_channels[arg->relative_component];
+//        rel_swizzle[2] = '\0';
+//        rel_rbracket = "]";
+    } // if
+
+//    snprintf(buf, buflen, "%s%s%s%s%s%s%s%s%s",
+//             premod_str, regtype_str, rel_lbracket, rel_offset,
+//             rel_regtype_str, rel_swizzle, rel_rbracket, swiz_str,
+//             postmod_str);
+    // !!! FIXME: make sure the scratch buffer was large enough.
+    return result;
+} // spv_load_srcarg
+
+// generate some convenience functions.
+#define MAKE_GLSL_SRCARG_STRING_(mask, bitmask) \
+    static inline uint32 spv_load_srcarg_##mask(Context *ctx, \
+                                                const size_t idx) { \
+        return spv_load_srcarg(ctx, idx, bitmask); \
+    }
+MAKE_GLSL_SRCARG_STRING_(x, (1 << 0))
+MAKE_GLSL_SRCARG_STRING_(y, (1 << 1))
+MAKE_GLSL_SRCARG_STRING_(z, (1 << 2))
+MAKE_GLSL_SRCARG_STRING_(w, (1 << 3))
+MAKE_GLSL_SRCARG_STRING_(scalar, (1 << 0))
+MAKE_GLSL_SRCARG_STRING_(full, 0xF)
+MAKE_GLSL_SRCARG_STRING_(masked, ctx->dest_arg.writemask)
+MAKE_GLSL_SRCARG_STRING_(vec3, 0x7)
+MAKE_GLSL_SRCARG_STRING_(vec2, 0x3)
+#undef MAKE_GLSL_SRCARG_STRING_
+
+static void spv_assign_destarg(Context *ctx, uint32 value)
+{
+    const DestArgInfo *arg = &ctx->dest_arg;
+    RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
+
+    if (arg->writemask == 0)
+    {
+        // Return without updating the reg->spirv.iddecl (all-zero writemask = no-op)
+        return;
+    } // if
+
+    if (arg->result_mod & MOD_SATURATE)
+    {
+        // TODO: The SPIRV translation of saturate(x) should look like:
+        // rd = Select(FUnordLessThan(rd, 0.0), 0.0, rd)
+        // rd = Select(FUnordGreaterThan(rd, 1.0), 1.0, rd)
+
+        fail(ctx, "saturating dest arg is unimplemented");
+    } // if
+
+    // MSDN says MOD_PP is a hint and many implementations ignore it. So do we.
+
+    // CENTROID only allowed in DCL opcodes, which shouldn't come through here.
+    assert((arg->result_mod & MOD_CENTROID) == 0);
+
+    if (ctx->predicated)
+    {
+        fail(ctx, "predicated destinations unsupported");  // !!! FIXME
+        return;
+    } // if
+
+    switch (arg->result_shift)
+    {
+        case 0x1: // result_shift_str = " * 2.0"; break;
+        case 0x2: // result_shift_str = " * 4.0"; break;
+        case 0x3: // result_shift_str = " * 8.0"; break;
+        case 0xD: // result_shift_str = " / 8.0"; break;
+        case 0xE: // result_shift_str = " / 4.0"; break;
+        case 0xF: // result_shift_str = " / 2.0"; break;
+            failf(ctx, "result shift %d not implemented", arg->result_shift);
+    } // switch
+
+    if (!writemask_xyzw(arg->writemask))
+    {
+        uint32 vec4 = spv_getvec4(ctx);
+        uint32 new_value = spv_bumpid(ctx);
+
+        push_output(ctx, &ctx->mainline);
+        output_spvop(ctx, SpvOpVectorShuffle, 5 + 4);
+        output_u32(ctx, vec4);
+        output_u32(ctx, new_value); // output id is new_value
+        // select between current value and new value based on writemask
+        output_u32(ctx, value);
+        output_u32(ctx, reg->spirv.iddecl);
+
+        // in the shuffle, components [0, 3] are the new value, and components
+        // [4, 7] are the existing value
+        if (arg->writemask0) output_u32(ctx, 0); else output_u32(ctx, 4);
+        if (arg->writemask1) output_u32(ctx, 1); else output_u32(ctx, 5);
+        if (arg->writemask2) output_u32(ctx, 2); else output_u32(ctx, 6);
+        if (arg->writemask3) output_u32(ctx, 3); else output_u32(ctx, 7);
+
+        pop_output(ctx);
+
+        value = new_value;
+    } // if
+
+    reg->spirv.iddecl = value;
+    reg->spirv.iduse = value;
+}
+
 static void emit_SPIRV_start(Context *ctx, const char *profilestr)
 {
     if (!(
@@ -9172,9 +9477,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
     char varname[64];
     uint32 tid;
     RegisterList *r = spv_getreg(ctx, regtype, regnum);
-
-    r->spirv.iddecl = spv_bumpid(ctx);
-    ctx->spirv.inoutcount += 1;
 
     // for OpName
     get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
@@ -9433,20 +9735,23 @@ static void emit_SPIRV_NOP(Context *ctx)
 
 static void emit_SPIRV_ADD(Context *ctx)
 {
-    RegisterList *lr, *rr;
-    uint32 lid, rid;
-    lr = spv_getreg(ctx, ctx->source_args[0].regtype, ctx->source_args[0].regnum);
-    rr = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
-    if (lr == NULL || rr == NULL) { failf(ctx, "lr == NULL || rr == NULL"); }
-    {
-        char l[3];
-        char r[3];
-        const char *lt, *rt;
-        lt = get_D3D_register_string(ctx, lr->regtype, lr->regnum, l, sizeof(l));
-        rt = get_D3D_register_string(ctx, rr->regtype, rr->regnum, r, sizeof(r));
-        fprintf(stderr, "%s: lr=%s%s rr=%s%s\n", __func__, lt, l, rt, r);
-    }
-} // emit_SPIRV_ADD
+    uint32 rs0, rs1, rd;
+    uint32 rtid; // result type id
+    rs0 = spv_load_srcarg_full(ctx, 0);
+    rs1 = spv_load_srcarg_full(ctx, 1);
+    rd = spv_bumpid(ctx);
+    rtid = spv_getvec4(ctx);
+
+    push_output(ctx, &ctx->mainline);
+    output_spvop(ctx, SpvOpFAdd, 5);
+    output_u32(ctx, rtid);
+    output_u32(ctx, rd);
+    output_u32(ctx, rs0);
+    output_u32(ctx, rs1);
+    pop_output(ctx);
+
+    spv_assign_destarg(ctx, rd);
+} // emit_SPIRV_ADDf
 
 static void emit_SPIRV_DEF(Context *ctx)
 {
@@ -9525,6 +9830,28 @@ static void emit_SPIRV_DEFB(Context *ctx)
     output_spvname(ctx, rl->spirv.iddecl, varname);
 } // emit_SPIRV_DEFB
 
+static void emit_SPIRV_DCL(Context *ctx)
+{
+    // TODO:
+    MOJOSHADER_usage usage = ctx->dwords[0];
+    const RegisterType regtype = ctx->dest_arg.regtype;
+    const int regnum = ctx->dest_arg.regnum;
+
+    // TODO: Do I need to do anything with the usage index?
+    const int index = ctx->dwords[1];
+
+    RegisterList *reg = spv_getreg(ctx, regtype, regnum);
+
+    // This id will be assigned to in emit_SPIRV_attribute, but
+    // emit_SPIRV_attribute is called after instructions are emitted,
+    // so we generate the id here so it can be used in instructions
+    reg->spirv.iddecl = spv_bumpid(ctx);
+    ctx->spirv.inoutcount += 1;
+    // TODO: Is it alright to leave iduse = 0?
+
+    add_attribute_register(ctx, regtype, regnum, usage, 0, 0xF, 0);
+} // emit_SPIRV_DCL
+
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
@@ -9555,7 +9882,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOOP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RET)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDLOOP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LABEL)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DCL)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DCL)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(POW)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CRS)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGN)
@@ -13041,12 +13368,12 @@ const MOJOSHADER_parseData *MOJOSHADER_parse(const char *profile,
 
     verify_swizzles(ctx);
 
+    if (!ctx->mainfn)
+        ctx->mainfn = StrDup(ctx, "main");
+
     // Version token always comes first.
     ctx->current_position = 0;
     rc = parse_version_token(ctx, profile);
-
-    if (!ctx->mainfn)
-        ctx->mainfn = StrDup(ctx, "main");
 
     // drop out now if this definitely isn't bytecode. Saves lots of
     //  meaningless errors flooding through.
