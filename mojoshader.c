@@ -8631,11 +8631,6 @@ static RegisterList *spv_getreg(Context *ctx, const RegisterType regtype, const 
     return r;
 } // spv_getreg
 
-static uint32 spv_loadreg(Context *ctx, RegisterList *r)
-{
-    failf(ctx, "function %s not implemented", __func__);
-} // spv_loadreg
-
 static void componentlist_free(Context *ctx, ComponentList *cl)
 {
     ComponentList *next;
@@ -9097,6 +9092,112 @@ static uint32 spv_getscalaru(Context *ctx, uint32 v)
     return cl->id;
 } // spv_getscalaru
 
+static uint32 spv_loadreg(Context *ctx, RegisterList *r)
+{
+    const char *retval = NULL;
+    int has_number = 1;
+
+    const RegisterType regtype = r->regtype;
+    const int regnum = r->regnum;
+
+    switch (regtype)
+    {
+        case REG_TYPE_TEMP: // r#
+        case REG_TYPE_CONST: // c#
+            return r->spirv.iddecl;
+
+        case REG_TYPE_INPUT: // v#
+        case REG_TYPE_SAMPLER: // s#
+        {
+            uint32 vec4 = spv_getvec4(ctx);
+            uint32 result = spv_bumpid(ctx);
+
+            push_output(ctx, &ctx->mainline);
+            output_spvop(ctx, SpvOpLoad, 4);
+            output_u32(ctx, vec4);
+            output_u32(ctx, result);
+            output_u32(ctx, r->spirv.iddecl);
+            pop_output(ctx);
+
+            return result;
+        }
+
+        case REG_TYPE_ADDRESS:  // (or REG_TYPE_TEXTURE, same value.)
+            retval = shader_is_vertex(ctx) ? "a" : "t";
+            break;
+
+        case REG_TYPE_RASTOUT:
+            switch ((RastOutType) regnum)
+            {
+                case RASTOUT_TYPE_POSITION: retval = "oPos"; break;
+                case RASTOUT_TYPE_FOG: retval = "oFog"; break;
+                case RASTOUT_TYPE_POINT_SIZE: retval = "oPts"; break;
+            } // switch
+            has_number = 0;
+            break;
+
+        case REG_TYPE_ATTROUT:
+            retval = "oD";
+            break;
+
+        case REG_TYPE_OUTPUT: // (or REG_TYPE_TEXCRDOUT, same value.)
+            if (shader_is_vertex(ctx) && shader_version_atleast(ctx, 3, 0))
+                retval = "o";
+            else
+                retval = "oT";
+            break;
+
+        case REG_TYPE_CONSTINT:
+            retval = "i";
+            break;
+
+        case REG_TYPE_COLOROUT:
+            retval = "oC";
+            break;
+
+        case REG_TYPE_DEPTHOUT:
+            retval = "oDepth";
+            has_number = 0;
+            break;
+
+        case REG_TYPE_CONSTBOOL:
+            retval = "b";
+            break;
+
+        case REG_TYPE_LOOP:
+            retval = "aL";
+            has_number = 0;
+            break;
+
+        case REG_TYPE_MISCTYPE:
+            switch ((const MiscTypeType) regnum)
+            {
+                case MISCTYPE_TYPE_POSITION: retval = "vPos"; break;
+                case MISCTYPE_TYPE_FACE: retval = "vFace"; break;
+            } // switch
+            has_number = 0;
+            break;
+
+        case REG_TYPE_LABEL:
+            retval = "l";
+            break;
+
+        case REG_TYPE_PREDICATE:
+            retval = "p";
+            break;
+
+            //case REG_TYPE_TEMPFLOAT16:  // !!! FIXME: don't know this asm string
+        default:
+            fail(ctx, "unknown register type");
+            retval = "???";
+            has_number = 0;
+            break;
+    } // switch
+
+    fprintf(stderr, "register type %s is unimplemented", retval);
+    return 0;
+} // spv_loadreg
+
 uint32 spv_swizzle(Context *ctx, uint32 arg, const int swizzle,
                    const int writemask)
 {
@@ -9156,7 +9257,7 @@ static uint32 spv_load_srcarg(Context *ctx, const size_t idx, const int writemas
     const SourceArgInfo *arg = &ctx->source_args[idx];
 
     const RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
-    uint32 result = reg->spirv.iddecl;
+    uint32 result = spv_loadreg(ctx, reg);
 
     result = spv_swizzle(ctx, result, arg->swizzle, writemask);
 
@@ -9398,8 +9499,25 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
         value = new_value;
     } // if
 
-    reg->spirv.iddecl = value;
-    reg->spirv.iduse = value;
+    switch (reg->regtype) {
+        case REG_TYPE_OUTPUT:
+            push_output(ctx, &ctx->mainline);
+            output_spvop(ctx, SpvOpStore, 3);
+            output_u32(ctx, reg->spirv.iddecl);
+            output_u32(ctx, value);
+            pop_output(ctx);
+            break;
+
+        case REG_TYPE_ADDRESS:
+        case REG_TYPE_TEMP:
+            reg->spirv.iddecl = value;
+            reg->spirv.iduse = value;
+            break;
+
+        default:
+            fprintf(stderr, "regtype %d is unimplemented for storing", reg->regtype);
+            break;
+    }
 }
 
 static void emit_SPIRV_start(Context *ctx, const char *profilestr)
