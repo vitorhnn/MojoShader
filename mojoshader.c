@@ -9754,7 +9754,9 @@ static void emit_SPIRV_finalize(Context *ctx)
     output_u32(ctx, SpvMagicNumber);
     output_u32(ctx, SpvVersion);
     output_u32(ctx, genmagic);
-    output_u32(ctx, ctx->spirv.idmax);
+    // "Bound: where all <id>s in this module are guaranteed to satisfy 0 < id < Bound"
+    // `idmax` holds the last id that was given out, so we need to emit `idmax + 1`
+    output_u32(ctx, ctx->spirv.idmax + 1);
     output_u32(ctx, 0);
 
     output_spvop(ctx, SpvOpCapability, 2);
