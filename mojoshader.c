@@ -10103,7 +10103,7 @@ static void emit_SPIRV_DCL(Context *ctx)
     add_attribute_register(ctx, regtype, regnum, usage, 0, 0xF, 0);
 } // emit_SPIRV_DCL
 
-static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src1, uint32 src2)
+static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src0, uint32 src1)
 {
     push_output(ctx, &ctx->mainline);
 
@@ -10112,8 +10112,8 @@ static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src1, uint32 src2)
     output_spvop(ctx, SpvOpDot, 5);
     output_id(ctx, float_tid);
     output_id(ctx, scalar_result);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 
     // Broadcast scalar result across all channels of a vec4i
     uint32 vector_result = spv_bumpid(ctx);
@@ -10130,25 +10130,25 @@ static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src1, uint32 src2)
 
 static void emit_SPIRV_DP4(Context *ctx)
 {
-    uint32 src1 = spv_load_srcarg_full(ctx, 0);
-    uint32 src2 = spv_load_srcarg_full(ctx, 1);
+    uint32 src0 = spv_load_srcarg_full(ctx, 0);
+    uint32 src1 = spv_load_srcarg_full(ctx, 1);
 
-    _emit_SPIRV_dotproduct(ctx, src1, src2);
+    _emit_SPIRV_dotproduct(ctx, src0, src1);
 }
 
 static void emit_SPIRV_DP3(Context *ctx)
 {
-    uint32 src1 = spv_load_srcarg_vec3(ctx, 0);
-    uint32 src2 = spv_load_srcarg_vec3(ctx, 1);
+    uint32 src0 = spv_load_srcarg_vec3(ctx, 0);
+    uint32 src1 = spv_load_srcarg_vec3(ctx, 1);
 
-    _emit_SPIRV_dotproduct(ctx, src1, src2);
+    _emit_SPIRV_dotproduct(ctx, src0, src1);
 }
 
 #define MAKE_SPIRV_EMITTER_DSS(name, emit_spvop) \
     static void emit_SPIRV_ ## name(Context *ctx) \
     { \
-        uint32 src1 = spv_load_srcarg_full(ctx, 0); \
-        uint32 src2 = spv_load_srcarg_full(ctx, 1); \
+        uint32 src0 = spv_load_srcarg_full(ctx, 0); \
+        uint32 src1 = spv_load_srcarg_full(ctx, 1); \
         uint32 result = spv_bumpid(ctx); \
         uint32 rtid = spv_getvec4(ctx); \
         \
@@ -10163,24 +10163,24 @@ MAKE_SPIRV_EMITTER_DSS(ADD, {
     output_spvop(ctx, SpvOpFAdd, 5);
     output_id(ctx, rtid);
     output_id(ctx, result);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(SUB, {
     output_spvop(ctx, SpvOpFSub, 5);
     output_id(ctx, rtid);
     output_id(ctx, result);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(MUL, {
     output_spvop(ctx, SpvOpFMul, 5);
     output_id(ctx, rtid);
     output_id(ctx, result);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(SLT, {
@@ -10189,8 +10189,8 @@ MAKE_SPIRV_EMITTER_DSS(SLT, {
     output_spvop(ctx, SpvOpFOrdLessThan, 5);
     output_id(ctx, rtid);
     output_id(ctx, result);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(SGE, {
@@ -10199,8 +10199,8 @@ MAKE_SPIRV_EMITTER_DSS(SGE, {
     output_spvop(ctx, SpvOpFOrdGreaterThanEqual, 5);
     output_id(ctx, rtid);
     output_id(ctx, result);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(MIN, {
@@ -10209,8 +10209,8 @@ MAKE_SPIRV_EMITTER_DSS(MIN, {
     output_id(ctx, result);
     output_id(ctx, spv_getext(ctx));
     output_id(ctx, GLSLstd450FMin);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(MAX, {
@@ -10219,8 +10219,8 @@ MAKE_SPIRV_EMITTER_DSS(MAX, {
     output_id(ctx, result);
     output_id(ctx, spv_getext(ctx));
     output_id(ctx, GLSLstd450FMax);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(POW, {
@@ -10229,8 +10229,8 @@ MAKE_SPIRV_EMITTER_DSS(POW, {
     output_id(ctx, result);
     output_id(ctx, spv_getext(ctx));
     output_id(ctx, GLSLstd450Pow);
+    output_id(ctx, src0);
     output_id(ctx, src1);
-    output_id(ctx, src2);
 })
 
 static uint32 SPIRV__extract_vec3(Context *ctx, uint32 input) {
@@ -10255,8 +10255,8 @@ static uint32 SPIRV__extract_vec3(Context *ctx, uint32 input) {
 
 MAKE_SPIRV_EMITTER_DSS(CRS, {
     uint32 vec3 = spv_getvec3(ctx);
+    uint32 src0_vec3 = SPIRV__extract_vec3(ctx, src0);
     uint32 src1_vec3 = SPIRV__extract_vec3(ctx, src1);
-    uint32 src2_vec3 = SPIRV__extract_vec3(ctx, src2);
     uint32 result_vec3 = spv_bumpid(ctx);
 
     output_spvop(ctx, SpvOpExtInst, 5 + 2);
@@ -10264,8 +10264,8 @@ MAKE_SPIRV_EMITTER_DSS(CRS, {
     output_id(ctx, result_vec3);
     output_id(ctx, spv_getext(ctx));
     output_id(ctx, GLSLstd450Cross);
+    output_id(ctx, src0_vec3);
     output_id(ctx, src1_vec3);
-    output_id(ctx, src2_vec3);
 
     output_spvop(ctx, SpvOpVectorShuffle, 5 + 4);
     output_id(ctx, rtid);
