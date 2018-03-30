@@ -36,7 +36,8 @@ typedef struct VariableList
     // that make up this variable.
     ConstantsList *constant;
     int used;
-    int emit_position;  // used in some profiles.
+    // used in some profiles like GLSL, where `constant == NULL` indicates that `emit_position` is used instead
+    int emit_position;
     struct VariableList *next;
 } VariableList;
 
@@ -302,6 +303,8 @@ typedef struct Context
             uint32 idptrivec4i;
             uint32 idptrvec4o;
             uint32 idptrivec4o;
+            uint32 idptrvec4p;
+            uint32 idptrivec4p;
             uint32 idptrfloato;
         } types;
         struct {
@@ -8745,6 +8748,15 @@ static void output_u32(Context *ctx, uint32 word)
     buffer_append(ctx->output, &word, sizeof(word));
 } // output_u32
 
+// Helper for debugging purposes, checks SSA id is not 0
+static void output_id(Context *ctx, uint32 id)
+{
+    if (id == 0) {
+        assert(0);
+    }
+    output_u32(ctx, id);
+} // output_id
+
 // (len) total op length in words, includes opcode + all params
 static void output_spvop(Context *ctx, uint32 op, uint32 len)
 {
@@ -9022,6 +9034,8 @@ SPV_MAKE_GETPTR(ptrvec4i, vec4, Input);
 SPV_MAKE_GETPTR(ptrivec4i, ivec4, Input);
 SPV_MAKE_GETPTR(ptrvec4o, vec4, Output);
 SPV_MAKE_GETPTR(ptrivec4o, ivec4, Output);
+SPV_MAKE_GETPTR(ptrvec4p, vec4, Private);
+SPV_MAKE_GETPTR(ptrivec4p, ivec4, Private);
 
 SPV_MAKE_GETPTR(ptrfloato, float, Output);
 
@@ -9145,108 +9159,54 @@ static uint32 spv_getscalaru(Context *ctx, uint32 v)
 
 static uint32 spv_loadreg(Context *ctx, RegisterList *r)
 {
-    const char *retval = NULL;
-    int has_number = 1;
-
     const RegisterType regtype = r->regtype;
     const int regnum = r->regnum;
+
+    uint32 tid;
 
     switch (regtype)
     {
         case REG_TYPE_TEMP: // r#
-        case REG_TYPE_CONST: // c#
-            return r->spirv.iddecl;
+            if (r->spirv.iddecl == 0)
+            {
+                r->spirv.iddecl = spv_bumpid(ctx);
+            }
+            tid = spv_getptrivec4p(ctx);
+            break;
 
         case REG_TYPE_INPUT: // v#
-        case REG_TYPE_SAMPLER: // s#
-        {
-            uint32 vec4 = spv_getvec4(ctx);
-            uint32 result = spv_bumpid(ctx);
-
-            push_output(ctx, &ctx->mainline);
-            output_spvop(ctx, SpvOpLoad, 4);
-            output_u32(ctx, vec4);
-            output_u32(ctx, result);
-            output_u32(ctx, r->spirv.iddecl);
-            pop_output(ctx);
-
-            return result;
-        }
-
-        case REG_TYPE_ADDRESS:  // (or REG_TYPE_TEXTURE, same value.)
-            retval = shader_is_vertex(ctx) ? "a" : "t";
+            tid = spv_getptrvec4i(ctx);
             break;
 
-        case REG_TYPE_RASTOUT:
-            switch ((RastOutType) regnum)
+        case REG_TYPE_CONST: // c#
+        case REG_TYPE_CONSTINT: // i#
+        case REG_TYPE_CONSTBOOL: // b#
+            if (r->spirv.iddecl == 0)
             {
-                case RASTOUT_TYPE_POSITION: retval = "oPos"; break;
-                case RASTOUT_TYPE_FOG: retval = "oFog"; break;
-                case RASTOUT_TYPE_POINT_SIZE: retval = "oPts"; break;
-            } // switch
-            has_number = 0;
+                r->spirv.iddecl = spv_bumpid(ctx);
+            }
+            tid = spv_getptrvec4u(ctx);
             break;
 
-        case REG_TYPE_ATTROUT:
-            retval = "oD";
-            break;
-
-        case REG_TYPE_OUTPUT: // (or REG_TYPE_TEXCRDOUT, same value.)
-            if (shader_is_vertex(ctx) && shader_version_atleast(ctx, 3, 0))
-                retval = "o";
-            else
-                retval = "oT";
-            break;
-
-        case REG_TYPE_CONSTINT:
-            retval = "i";
-            break;
-
-        case REG_TYPE_COLOROUT:
-            retval = "oC";
-            break;
-
-        case REG_TYPE_DEPTHOUT:
-            retval = "oDepth";
-            has_number = 0;
-            break;
-
-        case REG_TYPE_CONSTBOOL:
-            retval = "b";
-            break;
-
-        case REG_TYPE_LOOP:
-            retval = "aL";
-            has_number = 0;
-            break;
-
-        case REG_TYPE_MISCTYPE:
-            switch ((const MiscTypeType) regnum)
-            {
-                case MISCTYPE_TYPE_POSITION: retval = "vPos"; break;
-                case MISCTYPE_TYPE_FACE: retval = "vFace"; break;
-            } // switch
-            has_number = 0;
-            break;
-
-        case REG_TYPE_LABEL:
-            retval = "l";
-            break;
-
-        case REG_TYPE_PREDICATE:
-            retval = "p";
-            break;
-
-            //case REG_TYPE_TEMPFLOAT16:  // !!! FIXME: don't know this asm string
         default:
-            fail(ctx, "unknown register type");
-            retval = "???";
-            has_number = 0;
+        {
+            char varname[64];
+            get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof(varname));
+            failf(ctx, "register type %s is unimplemented", varname);
             break;
+        }
     } // switch
 
-    fprintf(stderr, "register type %s is unimplemented", retval);
-    return 0;
+    uint32 result = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline);
+    output_spvop(ctx, SpvOpLoad, 4);
+    output_id(ctx, tid);
+    output_id(ctx, result);
+    output_id(ctx, r->spirv.iddecl);
+    pop_output(ctx);
+
+    return result;
 } // spv_loadreg
 
 uint32 spv_swizzle(Context *ctx, uint32 arg, const int swizzle,
@@ -9307,7 +9267,7 @@ static uint32 spv_load_srcarg(Context *ctx, const size_t idx, const int writemas
 
     const SourceArgInfo *arg = &ctx->source_args[idx];
 
-    const RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
+    RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
     uint32 result = spv_loadreg(ctx, reg);
 
     result = spv_swizzle(ctx, result, arg->swizzle, writemask);
@@ -9322,9 +9282,9 @@ static uint32 spv_load_srcarg(Context *ctx, const size_t idx, const int writemas
             uint32 vec4 = spv_getvec4(ctx);
             push_output(ctx, &ctx->mainline);
             output_spvop(ctx, SpvOpFNegate, 4);
-            output_u32(ctx, vec4);
-            output_u32(ctx, new_result);
-            output_u32(ctx, result);
+            output_id(ctx, vec4);
+            output_id(ctx, new_result);
+            output_id(ctx, result);
             pop_output(ctx);
             result = new_result;
             break;
@@ -9488,6 +9448,14 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
     const DestArgInfo *arg = &ctx->dest_arg;
     RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
 
+    if (reg->regtype == REG_TYPE_TEMP)
+    {
+        if (reg->spirv.iddecl == 0)
+        {
+            reg->spirv.iddecl = spv_bumpid(ctx);
+        } // if
+    } // if
+
     if (arg->writemask == 0)
     {
         // Return without updating the reg->spirv.iddecl (all-zero writemask = no-op)
@@ -9532,11 +9500,11 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
 
         push_output(ctx, &ctx->mainline);
         output_spvop(ctx, SpvOpVectorShuffle, 5 + 4);
-        output_u32(ctx, vec4);
-        output_u32(ctx, new_value); // output id is new_value
+        output_id(ctx, vec4);
+        output_id(ctx, new_value); // output id is new_value
         // select between current value and new value based on writemask
-        output_u32(ctx, value);
-        output_u32(ctx, reg->spirv.iddecl);
+        output_id(ctx, value);
+        output_id(ctx, reg->spirv.iddecl);
 
         // in the shuffle, components [0, 3] are the new value, and components
         // [4, 7] are the existing value
@@ -9552,17 +9520,13 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
 
     switch (reg->regtype) {
         case REG_TYPE_OUTPUT:
-            push_output(ctx, &ctx->mainline);
-            output_spvop(ctx, SpvOpStore, 3);
-            output_u32(ctx, reg->spirv.iddecl);
-            output_u32(ctx, value);
-            pop_output(ctx);
-            break;
-
         case REG_TYPE_ADDRESS:
         case REG_TYPE_TEMP:
-            reg->spirv.iddecl = value;
-            reg->spirv.iduse = value;
+            push_output(ctx, &ctx->mainline);
+            output_spvop(ctx, SpvOpStore, 3);
+            output_id(ctx, reg->spirv.iddecl);
+            output_u32(ctx, value);
+            pop_output(ctx);
             break;
 
         default:
@@ -9628,14 +9592,117 @@ static void emit_SPIRV_phase(Context *ctx){
     // no-op
 } // emit_SPIRV_phase
 
-static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum){}
+static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
+{
+    char varname[64];
+
+    // for OpName
+    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
+
+    RegisterList *r = reglist_find(&ctx->used_registers, regtype, regnum);
+
+    // TODO: If the SSA id for this register is still 0 by this point, that means no instructions actually
+    // loaded from/stored to this variable...
+
+    if (r->spirv.iddecl == 0)
+    {
+        r->spirv.iddecl = spv_bumpid(ctx);
+    } // if
+
+    uint32 type;
+
+    switch (regtype)
+    {
+        case REG_TYPE_ADDRESS:
+        case REG_TYPE_PREDICATE:
+        case REG_TYPE_LOOP:
+        case REG_TYPE_LABEL:
+            failf(ctx, "unimplemented regtype %d", regtype);
+            return;
+        case REG_TYPE_TEMP:
+        {
+            push_output(ctx, &ctx->mainline_intro);
+            uint32 tid = spv_getptrvec4p(ctx);
+            output_spvop(ctx, SpvOpVariable, 4);
+            output_id(ctx, tid);
+            output_id(ctx, r->spirv.iddecl);
+            output_u32(ctx, SpvStorageClassPrivate);
+            pop_output(ctx);
+
+            output_spvname(ctx, r->spirv.iddecl, varname);
+            break;
+        }
+
+        default:
+            assert(!"Unexpected regtype in emit_SPIRV_global");
+    }
+}
+
 static void emit_SPIRV_array(Context *ctx, VariableList *var){}
 
 static void emit_SPIRV_const_array(Context *ctx,
                                    const struct ConstantsList *constslist,
                                    int base, int size){}
 static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
-                               const VariableList *var){}
+                               const VariableList *var)
+{
+    char varname[64];
+
+    // for OpName
+    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
+
+    RegisterList *r = reglist_find(&ctx->uniforms, regtype, regnum);
+
+    // TODO: If the SSA id for this register is still 0 by this point, that means no instructions actually
+    // loaded from/stored to this variable...
+
+    if (r->spirv.iddecl == 0)
+    {
+        r->spirv.iddecl = spv_bumpid(ctx);
+    } // if
+
+    if (var == NULL)
+    {
+        uint32 type;
+
+        switch (regtype)
+        {
+            case REG_TYPE_CONST:
+            case REG_TYPE_CONSTINT:
+            case REG_TYPE_CONSTBOOL:
+            {
+                push_output(ctx, &ctx->mainline_intro);
+                uint32 tid = spv_getptrvec4u(ctx);
+                output_spvop(ctx, SpvOpVariable, 4);
+                output_id(ctx, tid);
+                output_id(ctx, r->spirv.iddecl);
+                output_u32(ctx, SpvStorageClassInput);
+                pop_output(ctx);
+
+                output_spvname(ctx, r->spirv.iddecl, varname);
+                break;
+            }
+
+            default:
+                fail(ctx, "BUG: used a uniform we don't know how to define.");
+                break;
+        }
+    } // if
+
+    else
+    {
+        const int arraybase = var->index;
+        if (var->constant)
+        {
+            fail(ctx, "const array not implemented");
+        } // if
+        else
+        {
+            fail(ctx, "var->constant was NULL");
+            // TODO: Double check after writing emit_SPIRV_array and emit_SPIRV_const_array whether to use emit_position
+        } // else
+    } // else
+}
 static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype,
                                int texbem){}
 
@@ -9788,6 +9855,8 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
         fail(ctx, "Unknown shader type");  // state machine should catch this.
     } // else
 
+    r->usage = usage;
+
 } // emit_SPIRV_attribute
 
 static void emit_SPIRV_finalize(Context *ctx)
@@ -9915,10 +9984,10 @@ static void emit_SPIRV_ADD(Context *ctx)
 
     push_output(ctx, &ctx->mainline);
     output_spvop(ctx, SpvOpFAdd, 5);
-    output_u32(ctx, rtid);
-    output_u32(ctx, rd);
-    output_u32(ctx, rs0);
-    output_u32(ctx, rs1);
+    output_id(ctx, rtid);
+    output_id(ctx, rd);
+    output_id(ctx, rs0);
+    output_id(ctx, rs1);
     pop_output(ctx);
 
     spv_assign_destarg(ctx, rd);
@@ -10003,7 +10072,6 @@ static void emit_SPIRV_DEFB(Context *ctx)
 
 static void emit_SPIRV_DCL(Context *ctx)
 {
-    // TODO:
     MOJOSHADER_usage usage = ctx->dwords[0];
     const RegisterType regtype = ctx->dest_arg.regtype;
     const int regnum = ctx->dest_arg.regnum;
@@ -10019,6 +10087,13 @@ static void emit_SPIRV_DCL(Context *ctx)
     reg->spirv.iddecl = spv_bumpid(ctx);
     ctx->spirv.inoutcount += 1;
     // TODO: Is it alright to leave iduse = 0?
+
+    char varname[64];
+
+    // for OpName
+    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
+
+    output_spvname(ctx, reg->spirv.iddecl, varname);
 
     add_attribute_register(ctx, regtype, regnum, usage, 0, 0xF, 0);
 } // emit_SPIRV_DCL
@@ -13402,8 +13477,7 @@ static void process_definitions(Context *ctx)
     } // while
 
     // okay, now deal with uniform/constant arrays...
-    VariableList *var;
-    for (var = ctx->variables; var != NULL; var = var->next)
+    for (VariableList *var = ctx->variables; var != NULL; var = var->next)
     {
         if (var->used)
         {
@@ -13425,6 +13499,7 @@ static void process_definitions(Context *ctx)
     for (item = ctx->uniforms.next; item != NULL; item = item->next)
     {
         int arraysize = -1;
+        VariableList *var = NULL;
 
         // check if this is a register contained in an array...
         if (item->regtype == REG_TYPE_CONST)
