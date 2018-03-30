@@ -9162,7 +9162,7 @@ static uint32 spv_loadreg(Context *ctx, RegisterList *r)
     const RegisterType regtype = r->regtype;
     const int regnum = r->regnum;
 
-    uint32 tid;
+    uint32 tid = spv_getvec4(ctx);
 
     switch (regtype)
     {
@@ -9171,11 +9171,9 @@ static uint32 spv_loadreg(Context *ctx, RegisterList *r)
             {
                 r->spirv.iddecl = spv_bumpid(ctx);
             }
-            tid = spv_getptrivec4p(ctx);
             break;
 
         case REG_TYPE_INPUT: // v#
-            tid = spv_getptrvec4i(ctx);
             break;
 
         case REG_TYPE_CONST: // c#
@@ -9185,7 +9183,6 @@ static uint32 spv_loadreg(Context *ctx, RegisterList *r)
             {
                 r->spirv.iddecl = spv_bumpid(ctx);
             }
-            tid = spv_getptrvec4u(ctx);
             break;
 
         default:
@@ -9497,14 +9494,21 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
     {
         uint32 vec4 = spv_getvec4(ctx);
         uint32 new_value = spv_bumpid(ctx);
+        uint32 current_value = spv_bumpid(ctx);
 
         push_output(ctx, &ctx->mainline);
+
+        output_spvop(ctx, SpvOpLoad, 4);
+        output_id(ctx, vec4);
+        output_id(ctx, current_value);
+        output_id(ctx, reg->spirv.iddecl);
+
         output_spvop(ctx, SpvOpVectorShuffle, 5 + 4);
         output_id(ctx, vec4);
         output_id(ctx, new_value); // output id is new_value
         // select between current value and new value based on writemask
         output_id(ctx, value);
-        output_id(ctx, reg->spirv.iddecl);
+        output_id(ctx, current_value);
 
         // in the shuffle, components [0, 3] are the new value, and components
         // [4, 7] are the existing value
@@ -10098,6 +10102,47 @@ static void emit_SPIRV_DCL(Context *ctx)
     add_attribute_register(ctx, regtype, regnum, usage, 0, 0xF, 0);
 } // emit_SPIRV_DCL
 
+static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src1, uint32 src2)
+{
+    push_output(ctx, &ctx->mainline);
+
+    uint32 float_tid = spv_getfloat(ctx);
+    uint32 scalar_result = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpDot, 5);
+    output_id(ctx, float_tid);
+    output_id(ctx, scalar_result);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
+
+    // Broadcast scalar result across all channels of a vec4i
+    uint32 vector_result = spv_bumpid(ctx);
+    uint32 vec4_tid = spv_getvec4(ctx);
+    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
+    output_id(ctx, vec4_tid);
+    output_id(ctx, vector_result);
+    for (int i = 0; i < 4; i++) output_id(ctx, scalar_result);
+
+    pop_output(ctx);
+
+    spv_assign_destarg(ctx, vector_result);
+}
+
+static void emit_SPIRV_DP4(Context *ctx)
+{
+    uint32 src1 = spv_load_srcarg_full(ctx, 0);
+    uint32 src2 = spv_load_srcarg_full(ctx, 1);
+
+    _emit_SPIRV_dotproduct(ctx, src1, src2);
+}
+
+static void emit_SPIRV_DP3(Context *ctx)
+{
+    uint32 src1 = spv_load_srcarg_vec3(ctx, 0);
+    uint32 src2 = spv_load_srcarg_vec3(ctx, 1);
+
+    _emit_SPIRV_dotproduct(ctx, src1, src2);
+}
+
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
@@ -10105,8 +10150,8 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MUL)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP3)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP4)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP3)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP4)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MIN)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAX)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
