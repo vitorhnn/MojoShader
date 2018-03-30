@@ -420,6 +420,10 @@ static void print_shader(const char *fname, const MOJOSHADER_parseData *pd,
                 output = text->str;
                 output_len = text->length;
 
+                FILE* fdis = fopen("parsed.spvdis", "wt");
+                fwrite(output, 1, output_len, fdis);
+                fclose(fdis);
+
                 // FIXME: we're currently just leaking this disassembly...
             } // if
             else
