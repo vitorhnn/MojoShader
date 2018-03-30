@@ -10126,40 +10126,40 @@ static void emit_SPIRV_DP3(Context *ctx)
 #define MAKE_SPIRV_EMITTER_DSS(name, emit_spvop) \
     static void emit_SPIRV_ ## name(Context *ctx) \
     { \
-        uint32 rs0 = spv_load_srcarg_full(ctx, 0); \
-        uint32 rs1 = spv_load_srcarg_full(ctx, 1); \
-        uint32 rd = spv_bumpid(ctx); \
+        uint32 src1 = spv_load_srcarg_full(ctx, 0); \
+        uint32 src2 = spv_load_srcarg_full(ctx, 1); \
+        uint32 result = spv_bumpid(ctx); \
         uint32 rtid = spv_getvec4(ctx); \
         \
         push_output(ctx, &ctx->mainline); \
         emit_spvop; \
         pop_output(ctx); \
         \
-        spv_assign_destarg(ctx, rd); \
+        spv_assign_destarg(ctx, result); \
     }
 
 MAKE_SPIRV_EMITTER_DSS(ADD, {
     output_spvop(ctx, SpvOpFAdd, 5);
     output_id(ctx, rtid);
-    output_id(ctx, rd);
-    output_id(ctx, rs0);
-    output_id(ctx, rs1);
+    output_id(ctx, result);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(SUB, {
     output_spvop(ctx, SpvOpFSub, 5);
     output_id(ctx, rtid);
-    output_id(ctx, rd);
-    output_id(ctx, rs0);
-    output_id(ctx, rs1);
+    output_id(ctx, result);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(MUL, {
     output_spvop(ctx, SpvOpFMul, 5);
     output_id(ctx, rtid);
-    output_id(ctx, rd);
-    output_id(ctx, rs0);
-    output_id(ctx, rs1);
+    output_id(ctx, result);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(SLT, {
@@ -10167,9 +10167,9 @@ MAKE_SPIRV_EMITTER_DSS(SLT, {
     // "The comparisons EQ, GT, GE, LT, and LE, when either or both operands is NaN returns FALSE"
     output_spvop(ctx, SpvOpFOrdLessThan, 5);
     output_id(ctx, rtid);
-    output_id(ctx, rd);
-    output_id(ctx, rs0);
-    output_id(ctx, rs1);
+    output_id(ctx, result);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
 })
 
 MAKE_SPIRV_EMITTER_DSS(SGE, {
@@ -10177,9 +10177,39 @@ MAKE_SPIRV_EMITTER_DSS(SGE, {
     // "The comparisons EQ, GT, GE, LT, and LE, when either or both operands is NaN returns FALSE"
     output_spvop(ctx, SpvOpFOrdGreaterThanEqual, 5);
     output_id(ctx, rtid);
-    output_id(ctx, rd);
-    output_id(ctx, rs0);
-    output_id(ctx, rs1);
+    output_id(ctx, result);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
+})
+
+MAKE_SPIRV_EMITTER_DSS(MIN, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 2);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450FMin);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
+})
+
+MAKE_SPIRV_EMITTER_DSS(MAX, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 2);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450FMax);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
+})
+
+MAKE_SPIRV_EMITTER_DSS(POW, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 2);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450Pow);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
 })
 
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
@@ -10191,8 +10221,8 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP3)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP4)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MIN)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAX)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MIN)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAX)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGE)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXP)
@@ -10213,7 +10243,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RET)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDLOOP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LABEL)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DCL)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(POW)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(POW)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CRS)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGN)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ABS)
