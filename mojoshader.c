@@ -27,8 +27,13 @@ typedef struct ConstantsList
 typedef struct VariableList
 {
     MOJOSHADER_uniformType type;
+    // The indices of the constants that make up this variable are given by
+    // the range [index, index + count)
     int index;
+    // `count` constants make up this variable
     int count;
+    // Pointer to the first of `count` elements in a linked list of constants
+    // that make up this variable.
     ConstantsList *constant;
     int used;
     int emit_position;  // used in some profiles.
@@ -104,20 +109,28 @@ typedef struct CtabData
 typedef struct Context
 {
     int isfail;
+
     int out_of_memory;
     MOJOSHADER_malloc malloc;
     MOJOSHADER_free free;
     void *malloc_data;
+
+    // orig_tokens + current_position == tokens
     int current_position;
     const uint32 *orig_tokens;
     const uint32 *tokens;
-    uint32 tokencount;
+    uint32 tokencount; // How many remaining in `tokens`
+    // If !know_shader_size then tokencount is always 0xFFFFFFFF (an obscenely large value)
+    // and finding an `end` token is what tells us to terminate.
     int know_shader_size;
+
     const MOJOSHADER_swizzle *swizzles;
     unsigned int swizzles_count;
+
     const MOJOSHADER_samplerMap *samplermap;
     unsigned int samplermap_count;
-    Buffer *output;
+
+    // Buffers for each of the different sections of the generated code
     Buffer *preflight;
     Buffer *globals;
     Buffer *inputs;
@@ -130,61 +143,99 @@ typedef struct Context
     Buffer *mainline;
     Buffer *postflight;
     Buffer *ignore;
+
+    // `output` points to whichever one of the above buffers is the current output
+    Buffer *output;
     Buffer *output_stack[3];
-    int indent_stack[3];
     int output_stack_len;
+    int indent_stack[3];
     int indent;
-    const char *shader_type_str;
+
+    const char *shader_type_str; // "vs" or "ps"
+
+    // Line terminator for the platform
     const char *endline;
-    const char *mainfn;
     int endline_len;
+
+    const char *mainfn;
     int profileid;
     const struct Profile *profile;
     MOJOSHADER_shaderType shader_type;
     uint8 major_ver;
     uint8 minor_ver;
+    uint32 version_token; // the raw token that contains shader_type, major_ver, and minor_ver
+
+    // Values parsed from the current instruction
     DestArgInfo dest_arg;
     SourceArgInfo source_args[5];
     SourceArgInfo predicate_arg;  // for predicated instructions.
-    uint32 dwords[4];
-    uint32 version_token;
-    int instruction_count;
+    int predicated;
+    uint32 dwords[4]; // For passing miscellaneous constants, such as immediates, register usage, or sampler texture format
     uint32 instruction_controls;
     uint32 previous_opcode;
     int coissue;
+
+    // Is the current instruction allowed to use MOD_CENTROID
+    int centroid_allowed;
+
+    int instruction_count;
+
     int loops;
     int reps;
     int max_reps;
     int cmps;
+
     int scratch_registers;
     int max_scratch_registers;
+
     int branch_labels_stack_index;
     int branch_labels_stack[32];
+
     int assigned_branch_labels;
     int assigned_vertex_attributes;
     int last_address_reg_component;
+
+    // Registers are inserted into this anytime they are read or written. Temporary registers (r#) are asserted
+    // to have been written before being read.
     RegisterList used_registers;
+    // DEF, DEFI, DEFB, DCL, and label instructions insert their dest args into this list
     RegisterList defined_registers;
+
     ErrorList *errors;
+
     int constant_count;
     ConstantsList *constants;
+
     int uniform_count;
     int uniform_float4_count;
     int uniform_int4_count;
     int uniform_bool_count;
     RegisterList uniforms;
+
     int attribute_count;
     RegisterList attributes;
+
     int sampler_count;
     RegisterList samplers;
+
     VariableList *variables;  // variables to register mapping.
-    int centroid_allowed;
     CtabData ctab;
+
+    // Have we seen any instructions that relative-address any input attributes
     int have_relative_input_registers;
+    // Have we used more than one register of type REG_TYPE_COLOROUT
     int have_multi_color_outputs;
+
+    // Records whether `determine_constant_arrays()` has been called, which means that all DEF*
+    // instruction should now have been seen, the `ctx->constants` list is now sorted by the
+    // index of each constant, and the `ctx->variables` list has been built, which records the
+    // constant[s] that make up each variable.
     int determined_constants_arrays;
-    int predicated;
+
+    // Is there any output attribute register defined with usage == MOJOSHADER_USAGE_POINTSIZE
     int uses_pointsize;
+
+    // Is there any output attribute register defined with usage == MOJOSHADER_USAGE_FOG
     int uses_fog;
 
     // !!! FIXME: move these into SUPPORT_PROFILE sections.
@@ -10319,7 +10370,7 @@ static void determine_constants_arrays(Context *ctx)
                 var->emit_position = -1;
                 var->next = ctx->variables;
                 ctx->variables = var;
-            } // else
+            } // if
 
             start = i;   // set this as new start of sequence.
         } // if
