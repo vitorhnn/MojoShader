@@ -9977,26 +9977,6 @@ static void emit_SPIRV_NOP(Context *ctx)
     // no-op is a no-op.  :)
 } // emit_SPIRV_NOP
 
-static void emit_SPIRV_ADD(Context *ctx)
-{
-    uint32 rs0, rs1, rd;
-    uint32 rtid; // result type id
-    rs0 = spv_load_srcarg_full(ctx, 0);
-    rs1 = spv_load_srcarg_full(ctx, 1);
-    rd = spv_bumpid(ctx);
-    rtid = spv_getvec4(ctx);
-
-    push_output(ctx, &ctx->mainline);
-    output_spvop(ctx, SpvOpFAdd, 5);
-    output_id(ctx, rtid);
-    output_id(ctx, rd);
-    output_id(ctx, rs0);
-    output_id(ctx, rs1);
-    pop_output(ctx);
-
-    spv_assign_destarg(ctx, rd);
-} // emit_SPIRV_ADDf
-
 static void emit_SPIRV_DEF(Context *ctx)
 {
     RegisterList *rl;
@@ -10143,19 +10123,78 @@ static void emit_SPIRV_DP3(Context *ctx)
     _emit_SPIRV_dotproduct(ctx, src1, src2);
 }
 
+#define MAKE_SPIRV_EMITTER_DSS(name, emit_spvop) \
+    static void emit_SPIRV_ ## name(Context *ctx) \
+    { \
+        uint32 rs0 = spv_load_srcarg_full(ctx, 0); \
+        uint32 rs1 = spv_load_srcarg_full(ctx, 1); \
+        uint32 rd = spv_bumpid(ctx); \
+        uint32 rtid = spv_getvec4(ctx); \
+        \
+        push_output(ctx, &ctx->mainline); \
+        emit_spvop; \
+        pop_output(ctx); \
+        \
+        spv_assign_destarg(ctx, rd); \
+    }
+
+MAKE_SPIRV_EMITTER_DSS(ADD, {
+    output_spvop(ctx, SpvOpFAdd, 5);
+    output_id(ctx, rtid);
+    output_id(ctx, rd);
+    output_id(ctx, rs0);
+    output_id(ctx, rs1);
+})
+
+MAKE_SPIRV_EMITTER_DSS(SUB, {
+    output_spvop(ctx, SpvOpFSub, 5);
+    output_id(ctx, rtid);
+    output_id(ctx, rd);
+    output_id(ctx, rs0);
+    output_id(ctx, rs1);
+})
+
+MAKE_SPIRV_EMITTER_DSS(MUL, {
+    output_spvop(ctx, SpvOpFMul, 5);
+    output_id(ctx, rtid);
+    output_id(ctx, rd);
+    output_id(ctx, rs0);
+    output_id(ctx, rs1);
+})
+
+MAKE_SPIRV_EMITTER_DSS(SLT, {
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/cc308050(v=vs.85).aspx
+    // "The comparisons EQ, GT, GE, LT, and LE, when either or both operands is NaN returns FALSE"
+    output_spvop(ctx, SpvOpFOrdLessThan, 5);
+    output_id(ctx, rtid);
+    output_id(ctx, rd);
+    output_id(ctx, rs0);
+    output_id(ctx, rs1);
+})
+
+MAKE_SPIRV_EMITTER_DSS(SGE, {
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/cc308050(v=vs.85).aspx
+    // "The comparisons EQ, GT, GE, LT, and LE, when either or both operands is NaN returns FALSE"
+    output_spvop(ctx, SpvOpFOrdGreaterThanEqual, 5);
+    output_id(ctx, rtid);
+    output_id(ctx, rd);
+    output_id(ctx, rs0);
+    output_id(ctx, rs1);
+})
+
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAD)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MUL)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MUL)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP3)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP4)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MIN)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAX)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGE)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGE)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOG)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LIT)
