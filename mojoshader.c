@@ -10308,25 +10308,136 @@ static void emit_SPIRV_MAD (Context *ctx)
     spv_assign_destarg(ctx, result);
 }
 
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
+#define MAKE_SPIRV_EMITTER_DS(name, emit_spvop) \
+    static void emit_SPIRV_ ## name(Context *ctx) \
+    { \
+        uint32 src0 = spv_load_srcarg_full(ctx, 0); \
+        uint32 result = spv_bumpid(ctx); \
+        uint32 rtid = spv_getvec4(ctx); \
+        \
+        push_output(ctx, &ctx->mainline); \
+        emit_spvop; \
+        pop_output(ctx); \
+        \
+        spv_assign_destarg(ctx, result); \
+    }
+
+MAKE_SPIRV_EMITTER_DS(MOV, {
+    // This wastes the SSA id allocated for result, but do I really want to ruin a function this simple
+    result = src0;
+})
+
+MAKE_SPIRV_EMITTER_DS(RCP, {
+    uint32 one = spv_getscalarf(ctx, 1.0f);
+
+    output_spvop(ctx, SpvOpFDiv, 5);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, one);
+    output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(RSQ, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450InverseSqrt);
+    output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(EXP, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450Exp);
+    output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(SGN, {
+    // SGN also takes a src1 and src2 to use for intermediate results, they are left undefined after the instruction
+    // executes, and as such it is perfectly valid for us to not touch those registers in our implementation
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450FSign);
+    output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(ABS, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450FAbs);
+    output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(NRM, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450Normalize);
+    output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(FRC, {
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450Fract);
+    output_id(ctx, src0);
+})
+
+static void emit_SPIRV_LRP(Context *ctx)
+{
+    // lerp(x, y, a) = x + a*(y - x)
+    //               = x*(1 - a) + y*a
+    uint32 a = spv_load_srcarg_full(ctx, 0); // 'scale'
+    uint32 y = spv_load_srcarg_full(ctx, 1); // 'end'
+    uint32 x = spv_load_srcarg_full(ctx, 2); // 'start'
+    uint32 result = spv_bumpid(ctx);
+    uint32 rtid = spv_getvec4(ctx);
+
+    push_output(ctx, &ctx->mainline);
+
+    output_spvop(ctx, SpvOpExtInst, 5 + 3);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450FMix);
+    output_id(ctx, x);
+    output_id(ctx, y);
+    output_id(ctx, a);
+
+    pop_output(ctx);
+
+    spv_assign_destarg(ctx, result);
+}
+
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAD)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MUL)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP3)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP4)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MIN)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAX)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGE)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXP)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOG)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LIT)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DST)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LRP)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(FRC)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LRP)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(FRC)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X4)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X3)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X4)
@@ -10341,9 +10452,9 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LABEL)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DCL)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(POW)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CRS)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGN)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ABS)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(NRM)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGN)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ABS)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(NRM)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SINCOS)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(REP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDREP)
