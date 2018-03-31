@@ -10280,10 +10280,38 @@ MAKE_SPIRV_EMITTER_DSS(CRS, {
     output_u32(ctx, 0xFFFFFFFF);
 })
 
+static void emit_SPIRV_MAD (Context *ctx)
+{
+    uint32 src0 = spv_load_srcarg_full(ctx, 0);
+    uint32 src1 = spv_load_srcarg_full(ctx, 1);
+    uint32 src2 = spv_load_srcarg_full(ctx, 2);
+    uint32 mul_result = spv_bumpid(ctx);
+    uint32 result = spv_bumpid(ctx);
+    uint32 vec4 = spv_getvec4(ctx);
+
+    push_output(ctx, &ctx->mainline);
+
+    output_spvop(ctx, SpvOpFMul, 5);
+    output_id(ctx, vec4);
+    output_id(ctx, mul_result);
+    output_id(ctx, src0);
+    output_id(ctx, src1);
+
+    output_spvop(ctx, SpvOpFAdd, 5);
+    output_id(ctx, vec4);
+    output_id(ctx, result);
+    output_id(ctx, mul_result);
+    output_id(ctx, src2);
+
+    pop_output(ctx);
+
+    spv_assign_destarg(ctx, result);
+}
+
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAD)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MAD)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MUL)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RCP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RSQ)
