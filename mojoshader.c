@@ -10419,6 +10419,81 @@ static void emit_SPIRV_LRP(Context *ctx)
     spv_assign_destarg(ctx, result);
 }
 
+const int NULL_SWIZZLE = 0xE4; // 0xE4 == 11100100 ... 0 1 2 3. No swizzle.
+
+static void _emit_SPIRV_vecXmatrix(Context *ctx, int rows, int writemask)
+{
+    assert(rows <= 4);
+    assert(writemask == 0x7 || writemask == 0xF);
+
+    uint32 src0 = spv_load_srcarg(ctx, 0, writemask);
+    uint32 float_tid = spv_getfloat(ctx);
+    uint32 vec4_tid = spv_getvec4(ctx);
+
+    RegisterType src1type = ctx->source_args[1].regtype;
+    int src1num = ctx->source_args[1].regnum;
+
+
+    uint32 result_components[4];
+    for (int i = 0; i < rows; i++)
+    {
+        uint32 row = spv_loadreg(ctx, spv_getreg(ctx, src1type, src1num + i));
+        row = spv_swizzle(ctx, row, NULL_SWIZZLE, writemask);
+        uint32 dot_result = spv_bumpid(ctx);
+
+        push_output(ctx, &ctx->mainline);
+        output_spvop(ctx, SpvOpDot, 5);
+        output_id(ctx, float_tid);
+        output_id(ctx, dot_result);
+        output_id(ctx, src0);
+        output_id(ctx, row);
+        pop_output(ctx);
+
+        result_components[i] = dot_result;
+    }
+
+    uint32 result = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline);
+    output_spvop(ctx, SpvOpCompositeConstruct, 3 + rows);
+    output_id(ctx, vec4_tid);
+    output_id(ctx, result);
+    for (int i = 0; i < rows; i++) output_id(ctx, result_components[i]);
+    pop_output(ctx);
+
+    spv_assign_destarg(ctx, result);
+}
+
+static void emit_SPIRV_M4X4(Context *ctx)
+{
+    // float4 * (4 columns, 4 rows) -> float4
+    _emit_SPIRV_vecXmatrix(ctx, 4, 0xF);
+}
+
+static void emit_SPIRV_M4X3(Context *ctx)
+{
+    // float4 * (4 columns, 3 rows) -> float3
+    _emit_SPIRV_vecXmatrix(ctx, 3, 0xF);
+}
+
+static void emit_SPIRV_M3X4(Context *ctx)
+{
+    // float3 * (3 columns, 4 rows) -> float4
+    _emit_SPIRV_vecXmatrix(ctx, 4, 0x7);
+}
+
+static void emit_SPIRV_M3X3(Context *ctx)
+{
+    // float3 * (3 columns, 3 rows) -> float3
+    _emit_SPIRV_vecXmatrix(ctx, 3, 0x7);
+}
+
+static void emit_SPIRV_M3X2(Context *ctx)
+{
+    // float3 * (3 columns, 2 rows) -> float2
+    _emit_SPIRV_vecXmatrix(ctx, 2, 0x7);
+}
+
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
@@ -10438,11 +10513,11 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LIT)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DST)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LRP)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(FRC)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X4)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X3)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X4)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X3)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X2)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X4)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M4X3)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X4)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X3)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(M3X2)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CALL)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CALLNZ)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOOP)
