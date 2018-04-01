@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "../mojoshader.h"
 #include "spirv-tools/libspirv.h"
 
@@ -403,7 +404,18 @@ static void print_shader(const char *fname, const MOJOSHADER_parseData *pd,
 
             if (is_spirv)
             {
-                FILE* f = fopen("parsed.spv", "wb");
+                char filename[64];
+                const char *shader_type = NULL;
+                switch (pd->shader_type)
+                {
+                    case MOJOSHADER_TYPE_PIXEL: shader_type = "ps"; break;
+                    case MOJOSHADER_TYPE_VERTEX: shader_type = "vs"; break;
+                    case MOJOSHADER_TYPE_GEOMETRY: shader_type = "gs"; break;
+                    default: assert(!"Invalid shader type");
+                }
+
+                snprintf(filename, sizeof(filename), "%s.%s.spv", pd->mainfn, shader_type);
+                FILE* f = fopen(filename, "wb");
                 fwrite(pd->output, 1, pd->output_len, f);
                 fclose(f);
 
@@ -420,7 +432,8 @@ static void print_shader(const char *fname, const MOJOSHADER_parseData *pd,
                 output = text->str;
                 output_len = text->length;
 
-                FILE* fdis = fopen("parsed.spvdis", "wt");
+                snprintf(filename, sizeof(filename), "%s.%s.spvdis", pd->mainfn, shader_type);
+                FILE* fdis = fopen(filename, "wt");
                 fwrite(output, 1, output_len, fdis);
                 fclose(fdis);
 
