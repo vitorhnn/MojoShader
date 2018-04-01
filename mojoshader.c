@@ -9178,6 +9178,66 @@ static uint32 spv_getscalaru(Context *ctx, uint32 v)
     return cl->id;
 } // spv_getscalaru
 
+static void spv_check_read_reg_id(Context *ctx, RegisterList *r)
+{
+    if (r->spirv.iddecl == 0)
+    {
+        switch (r->regtype)
+        {
+            case REG_TYPE_INPUT: // v#
+            {
+                char varname[64];
+                get_SPIRV_varname_in_buf(ctx, r->regtype, r->regnum, varname, sizeof(varname));
+                failf(ctx, "tried to load from undeclared register %s\n", varname);
+                break;
+            }
+
+            case REG_TYPE_TEMP: // r#
+            case REG_TYPE_CONST: // c#
+            case REG_TYPE_CONSTINT: // i#
+            case REG_TYPE_CONSTBOOL: // b#
+                r->spirv.iddecl = spv_bumpid(ctx);
+                break;
+
+            default:
+            {
+                char varname[64];
+                get_SPIRV_varname_in_buf(ctx, r->regtype, r->regnum, varname, sizeof(varname));
+                failf(ctx, "register type %s is unimplemented\n", varname);
+                break;
+            }
+        } // switch
+    } // if
+}
+
+static void spv_check_write_reg_id(Context *ctx, RegisterList *r)
+{
+    if (r->spirv.iddecl == 0)
+    {
+        switch (r->regtype)
+        {
+            // These registers require no declarations, so we can just create them as we see them
+            case REG_TYPE_TEMP:
+            case REG_TYPE_RASTOUT:
+            case REG_TYPE_COLOROUT:
+            case REG_TYPE_TEXCRDOUT:
+            case REG_TYPE_DEPTHOUT:
+            case REG_TYPE_ATTROUT:
+                r->spirv.iddecl = spv_bumpid(ctx);
+                break;
+
+            // Other register types should be explicitly declared, so it is an error for them to have iddecl == 0 by now
+            default:
+            {
+                char varname[64];
+                get_SPIRV_varname_in_buf(ctx, r->regtype, r->regnum, varname, sizeof(varname));
+                failf(ctx, "tried to write to undeclared register %s\n", varname);
+                break;
+            }
+        } // switch
+    } // if
+}
+
 static uint32 spv_loadreg(Context *ctx, RegisterList *r)
 {
     const RegisterType regtype = r->regtype;
@@ -9185,35 +9245,7 @@ static uint32 spv_loadreg(Context *ctx, RegisterList *r)
 
     uint32 tid = spv_getvec4(ctx);
 
-    switch (regtype)
-    {
-        case REG_TYPE_TEMP: // r#
-            if (r->spirv.iddecl == 0)
-            {
-                r->spirv.iddecl = spv_bumpid(ctx);
-            }
-            break;
-
-        case REG_TYPE_INPUT: // v#
-            break;
-
-        case REG_TYPE_CONST: // c#
-        case REG_TYPE_CONSTINT: // i#
-        case REG_TYPE_CONSTBOOL: // b#
-            if (r->spirv.iddecl == 0)
-            {
-                r->spirv.iddecl = spv_bumpid(ctx);
-            }
-            break;
-
-        default:
-        {
-            char varname[64];
-            get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof(varname));
-            failf(ctx, "register type %s is unimplemented", varname);
-            break;
-        }
-    } // switch
+    spv_check_read_reg_id(ctx, r);
 
     uint32 result = spv_bumpid(ctx);
 
@@ -9466,13 +9498,7 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
     const DestArgInfo *arg = &ctx->dest_arg;
     RegisterList *reg = spv_getreg(ctx, arg->regtype, arg->regnum);
 
-    if (reg->regtype == REG_TYPE_TEMP)
-    {
-        if (reg->spirv.iddecl == 0)
-        {
-            reg->spirv.iddecl = spv_bumpid(ctx);
-        } // if
-    } // if
+    spv_check_write_reg_id(ctx, reg);
 
     if (arg->writemask == 0)
     {
@@ -9547,6 +9573,10 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
         case REG_TYPE_OUTPUT:
         case REG_TYPE_ADDRESS:
         case REG_TYPE_TEMP:
+        case REG_TYPE_DEPTHOUT:
+        case REG_TYPE_COLOROUT:
+        case REG_TYPE_RASTOUT:
+        case REG_TYPE_ATTROUT:
             push_output(ctx, &ctx->mainline);
             output_spvop(ctx, SpvOpStore, 3);
             output_id(ctx, reg->spirv.iddecl);
@@ -9555,8 +9585,12 @@ static void spv_assign_destarg(Context *ctx, uint32 value)
             break;
 
         default:
-            fprintf(stderr, "regtype %d is unimplemented for storing", reg->regtype);
+        {
+            char varname[64];
+            get_SPIRV_varname_in_buf(ctx, reg->regtype, reg->regnum, varname, sizeof(varname));
+            failf(ctx, "register %s is unimplemented for storing", varname);
             break;
+        }
     }
 }
 
@@ -9738,6 +9772,8 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
     char varname[64];
     uint32 tid;
     RegisterList *r = spv_getreg(ctx, regtype, regnum);
+
+    ctx->spirv.inoutcount += 1;
 
     // for OpName
     get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
@@ -10077,20 +10113,16 @@ static void emit_SPIRV_DEFB(Context *ctx)
 
 static void emit_SPIRV_DCL(Context *ctx)
 {
-    MOJOSHADER_usage usage = ctx->dwords[0];
     const RegisterType regtype = ctx->dest_arg.regtype;
     const int regnum = ctx->dest_arg.regnum;
 
-    // TODO: Do I need to do anything with the usage index?
-    const int index = ctx->dwords[1];
-
+    // state_DCL handles checking if the registers are valid for this instruction, and collecting samplers and attribs
     RegisterList *reg = spv_getreg(ctx, regtype, regnum);
 
     // This id will be assigned to in emit_SPIRV_attribute, but
     // emit_SPIRV_attribute is called after instructions are emitted,
     // so we generate the id here so it can be used in instructions
     reg->spirv.iddecl = spv_bumpid(ctx);
-    ctx->spirv.inoutcount += 1;
     // TODO: Is it alright to leave iduse = 0?
 
     char varname[64];
@@ -10099,8 +10131,6 @@ static void emit_SPIRV_DCL(Context *ctx)
     get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
 
     output_spvname(ctx, reg->spirv.iddecl, varname);
-
-    add_attribute_register(ctx, regtype, regnum, usage, 0, 0xF, 0);
 } // emit_SPIRV_DCL
 
 static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src0, uint32 src1)
