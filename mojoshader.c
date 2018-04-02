@@ -9247,6 +9247,7 @@ static void spv_check_read_reg_id(Context *ctx, RegisterList *r)
         switch (r->regtype)
         {
             case REG_TYPE_INPUT: // v#
+            case REG_TYPE_SAMPLER: // s#
             {
                 char varname[64];
                 get_SPIRV_varname_in_buf(ctx, r->regtype, r->regnum, varname, sizeof(varname));
@@ -9300,12 +9301,50 @@ static void spv_check_write_reg_id(Context *ctx, RegisterList *r)
     } // if
 }
 
+static uint32 spv_ptrimage_from_texturetype(Context *ctx, TextureType ttype)
+{
+    switch (ttype)
+    {
+        case TEXTURE_TYPE_2D:
+            return spv_getptrimage2d(ctx);
+        case TEXTURE_TYPE_CUBE:
+            return spv_getptrimage3d(ctx);
+        case TEXTURE_TYPE_VOLUME:
+            return spv_getptrimagecube(ctx);
+        default:
+            fail(ctx, "BUG: used a sampler we don't know how to define.");
+            return 0;
+    } // switch
+} // spv_ptrimage_from_texturetype
+
+static uint32 spv_image_from_texturetype(Context *ctx, TextureType ttype)
+{
+    switch (ttype)
+    {
+        case TEXTURE_TYPE_2D:
+            return spv_getimage2d(ctx);
+        case TEXTURE_TYPE_CUBE:
+            return spv_getimage3d(ctx);
+        case TEXTURE_TYPE_VOLUME:
+            return spv_getimagecube(ctx);
+        default:
+            fail(ctx, "BUG: used a sampler we don't know how to define.");
+            return 0;
+    } // switch
+} // spv_ptrimage_from_texturetype
+
 static uint32 spv_loadreg(Context *ctx, RegisterList *r)
 {
     const RegisterType regtype = r->regtype;
-    const int regnum = r->regnum;
 
-    uint32 tid = spv_getvec4(ctx);
+    uint32 tid;
+    if (regtype == REG_TYPE_SAMPLER)
+    {
+        RegisterList *sreg = reglist_find(&ctx->samplers, REG_TYPE_SAMPLER, r->regnum);
+        tid = spv_image_from_texturetype(ctx, (TextureType)sreg->index);
+    }
+    else
+        tid = spv_getvec4(ctx);
 
     spv_check_read_reg_id(ctx, r);
 
@@ -9813,9 +9852,36 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
             // TODO: Double check after writing emit_SPIRV_array and emit_SPIRV_const_array whether to use emit_position
         } // else
     } // else
-}
-static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype,
-                               int texbem){}
+} // emit_SPIRV_uniform
+
+static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype, int texbem)
+{
+    uint32 type = spv_ptrimage_from_texturetype(ctx, ttype);
+
+    RegisterList *sampler_reg = spv_getreg(ctx, REG_TYPE_SAMPLER, stage);
+    uint32 result = sampler_reg->spirv.iddecl;
+
+    push_output(ctx, &ctx->mainline_intro);
+    output_spvop(ctx, SpvOpVariable, 4);
+    output_id(ctx, type);
+    output_id(ctx, result);
+    output_u32(ctx, SpvStorageClassUniform);
+    if (texbem)  // This sampler used a ps_1_1 TEXBEM opcode?
+    {
+        fail(ctx, "texbem not implemented");
+//        char name[64];
+//        const int index = ctx->uniform_float4_count;
+//        ctx->uniform_float4_count += 2;
+//        get_GLSL_uniform_array_varname(ctx, REG_TYPE_CONST, name, sizeof (name));
+//        output_line(ctx, "#define %s_texbem %s[%d]", var, name, index);
+//        output_line(ctx, "#define %s_texbeml %s[%d]", var, name, index+1);
+    } // if
+    pop_output(ctx);
+
+    char varname[64];
+    get_SPIRV_varname_in_buf(ctx, REG_TYPE_SAMPLER, stage, varname, sizeof(varname));
+    output_spvname(ctx, result, varname);
+} // emit_SPIRV_sampler
 
 static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                                  MOJOSHADER_usage usage, int index, int wmask,
@@ -10528,6 +10594,110 @@ static void emit_SPIRV_M3X2(Context *ctx)
     _emit_SPIRV_vecXmatrix(ctx, 2, 0x7);
 }
 
+static void spv_texld(Context *ctx, const int texldd)
+{
+    if (!shader_version_atleast(ctx, 1, 4))
+    {
+        fail(ctx, "TEXLD on Shader Model < 1.4 unimplemented"); // !!! FIXME
+        return;
+    } // if
+
+    else if (!shader_version_atleast(ctx, 2, 0))
+    {
+        // ps_1_4 is different, too!
+        fail(ctx, "TEXLD == Shader Model 1.4 unimplemented.");  // !!! FIXME
+        return;
+    } // else if
+
+    else
+    {
+        const SourceArgInfo *samp_arg = &ctx->source_args[1];
+        RegisterList *sampler_reg = reglist_find(&ctx->samplers, REG_TYPE_SAMPLER, samp_arg->regnum);
+        const SourceArgInfo *texcoord_arg = &ctx->source_args[0];
+        RegisterList *texcoord_reg = spv_getreg(ctx, texcoord_arg->regtype, texcoord_arg->regnum);
+
+        if (sampler_reg == NULL)
+        {
+            fail(ctx, "TEXLD using undeclared sampler");
+            return;
+        } // if
+
+        if (texldd)
+        {
+            fail(ctx, "TEXLDD is currently not implemented.");
+//            if (sampler_reg->index == TEXTURE_TYPE_2D)
+//            {
+//                make_GLSL_srcarg_string_vec2(ctx, 2, src2, sizeof (src2));
+//                make_GLSL_srcarg_string_vec2(ctx, 3, src3, sizeof (src3));
+//            } // if
+//            else
+//            {
+//                assert((sampler_reg->index == TEXTURE_TYPE_CUBE) || (sampler_reg->index == TEXTURE_TYPE_VOLUME));
+//                make_GLSL_srcarg_string_vec3(ctx, 2, src2, sizeof (src2));
+//                make_GLSL_srcarg_string_vec3(ctx, 3, src3, sizeof (src3));
+//            } // else
+        } // if
+
+        // !!! FIXME: can TEXLDD set instruction_controls?
+        // !!! FIXME: does the d3d bias value map directly to GLSL?
+        uint32 bias = 0;
+
+        if (ctx->instruction_controls == CONTROL_TEXLDB)
+        {
+            uint32 float_tid = spv_getfloat(ctx);
+            bias = spv_bumpid(ctx);
+
+            push_output(ctx, &ctx->mainline);
+            output_spvop(ctx, SpvOpCompositeExtract, 4 + 1);
+            output_id(ctx, float_tid);
+            output_id(ctx, bias);
+            output_id(ctx, texcoord_reg->spirv.iddecl);
+            output_u32(ctx, 3); // The w component of texcoord_reg specifies the bias. Extract it from texcoord_reg
+            pop_output(ctx);
+        }
+
+        if ((TextureType) sampler_reg->index == TEXTURE_TYPE_CUBE &&
+            ctx->instruction_controls == CONTROL_TEXLDP)
+        {
+            fail(ctx, "TEXLDP on a cubemap");  // !!! FIXME: is this legal?
+        } // if
+
+        uint32 opcode = (ctx->instruction_controls == CONTROL_TEXLDP) ?
+                        SpvOpImageSampleProjImplicitLod :
+                        SpvOpImageSampleImplicitLod;
+
+        uint32 instruction_length = (bias == 0) ? 5 : 7;
+
+        uint32 vec4_tid = spv_getvec4(ctx);
+        uint32 result = spv_bumpid(ctx);
+        uint32 sampler = spv_load_srcarg_full(ctx, 1);
+        // OpImageSampleImplicitLod should ignore the components of this argument that
+        // it doesn't need, so we don't need to mask it
+        uint32 texcoord = spv_load_srcarg_full(ctx, 0);
+
+        push_output(ctx, &ctx->mainline);
+        output_spvop(ctx, opcode, instruction_length);
+        output_id(ctx, vec4_tid);
+        output_id(ctx, result);
+        output_id(ctx, sampler);
+        output_id(ctx, texcoord);
+        if (bias != 0)
+        {
+            output_u32(ctx, SpvImageOperandsBiasMask);
+            output_id(ctx, bias);
+        } // if
+        pop_output(ctx);
+
+        assert(!isscalar(ctx, ctx->shader_type, samp_arg->regtype, samp_arg->regnum));
+        spv_assign_destarg(ctx, result);
+    } // else
+} // spv_texld
+
+static void emit_SPIRV_TEXLD(Context *ctx)
+{
+    spv_texld(ctx, 0);
+}
+
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOV)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ADD)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SUB)
@@ -10579,7 +10749,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOVA)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RESERVED)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXCRD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXKILL)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXLD)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXLD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXBEM)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXBEML)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXREG2AR)
