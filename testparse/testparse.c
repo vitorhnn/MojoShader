@@ -419,23 +419,39 @@ static void print_shader(const char *fname, const MOJOSHADER_parseData *pd,
                 fwrite(pd->output, 1, pd->output_len, f);
                 fclose(f);
 
+                uint32_t *words = pd->output;
+                size_t word_count = pd->output_len / 4;
+
                 spv_text text;
                 spv_diagnostic diagnostic;
                 spv_context ctx = spvContextCreate(SPV_ENV_UNIVERSAL_1_0);
                 int options = /*SPV_BINARY_TO_TEXT_OPTION_COLOR |*/ SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
-                spv_result_t result = spvBinaryToText(ctx, (uint32_t *)pd->output, pd->output_len / 4, options, &text, &diagnostic);
-                if (result != SPV_SUCCESS)
+                spv_result_t disResult = spvBinaryToText(ctx, words, word_count, options, &text, &diagnostic);
+                if (disResult == SPV_SUCCESS)
+                {
+                    output = text->str;
+                    output_len = text->length;
+
+                    snprintf(filename, sizeof(filename), "%s.%s.spvdis", pd->mainfn, shader_type);
+                    FILE* fdis = fopen(filename, "wt");
+                    fwrite(output, 1, output_len, fdis);
+                    fclose(fdis);
+                } // if
+                else
                 {
                     fprintf(stderr, "\nERROR DIAGNOSTIC: %s\n\n", diagnostic->error);
-                    exit(EXIT_FAILURE);
-                }
-                output = text->str;
-                output_len = text->length;
+                } // else
 
-                snprintf(filename, sizeof(filename), "%s.%s.spvdis", pd->mainfn, shader_type);
-                FILE* fdis = fopen(filename, "wt");
-                fwrite(output, 1, output_len, fdis);
-                fclose(fdis);
+                spv_result_t validateResult = spvValidateBinary(ctx, words, word_count, &diagnostic);
+                if (validateResult != SPV_SUCCESS)
+                {
+                    fprintf(stderr, "\nVALIDATION FAILURE: %s\n\n", diagnostic->error);
+                } // if
+
+                if (disResult != SPV_SUCCESS || validateResult != SPV_SUCCESS)
+                {
+                    exit(EXIT_FAILURE);
+                } // if
 
                 // FIXME: we're currently just leaking this disassembly...
             } // if
