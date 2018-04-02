@@ -8820,6 +8820,14 @@ static void output_spvname(Context *ctx, uint32 id, const char *str)
     pop_output(ctx);
 } // output_spvname
 
+// emit an OpName instruction to identify a register
+static void output_spv_regname(Context *ctx, uint32 id, RegisterType regtype, int regnum)
+{
+    char varname[64];
+    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof(varname));
+    output_spvname(ctx, id, varname);
+} // output_spv_regname
+
 // emits an OpDecorate BuiltIn straight into ctx->helpers
 static void output_spvbuiltin(Context *ctx, uint32 id, SpvBuiltIn builtin)
 {
@@ -9780,9 +9788,7 @@ static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
             output_u32(ctx, SpvStorageClassPrivate);
             pop_output(ctx);
 
-            char varname[64];
-            get_SPIRV_varname_in_buf(ctx, r->regtype, r->regnum, varname, sizeof(varname));
-            output_spvname(ctx, r->spirv.iddecl, varname);
+            output_spv_regname(ctx, r->spirv.iddecl, r->regtype, r->regnum);
             break;
         }
 
@@ -9827,9 +9833,7 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
                 output_u32(ctx, SpvStorageClassUniform);
                 pop_output(ctx);
 
-                char varname[64];
-                get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
-                output_spvname(ctx, r->spirv.iddecl, varname);
+                output_spv_regname(ctx, r->spirv.iddecl, regtype, regnum);
                 break;
             }
 
@@ -9878,23 +9882,17 @@ static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype, int t
     } // if
     pop_output(ctx);
 
-    char varname[64];
-    get_SPIRV_varname_in_buf(ctx, REG_TYPE_SAMPLER, stage, varname, sizeof(varname));
-    output_spvname(ctx, result, varname);
+    output_spv_regname(ctx, result, REG_TYPE_SAMPLER, stage);
 } // emit_SPIRV_sampler
 
 static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                                  MOJOSHADER_usage usage, int index, int wmask,
                                  int flags)
 {
-    char varname[64];
     uint32 tid;
     RegisterList *r = spv_getreg(ctx, regtype, regnum);
 
     ctx->spirv.inoutcount += 1;
-
-    // for OpName
-    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
 
     if (shader_is_vertex(ctx))
     {
@@ -9946,8 +9944,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
             output_u32(ctx, r->spirv.iddecl);
             output_u32(ctx, SpvStorageClassInput);
             pop_output(ctx);
-
-            output_spvname(ctx, r->spirv.iddecl, varname);
         } // if
 
         else if (regtype == REG_TYPE_OUTPUT)
@@ -9960,8 +9956,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
             output_u32(ctx, r->spirv.iddecl);
             output_u32(ctx, SpvStorageClassOutput);
             pop_output(ctx);
-
-            output_spvname(ctx, r->spirv.iddecl, varname);
         } // else if
 
         else
@@ -9990,9 +9984,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                 output_u32(ctx, r->spirv.iddecl);
                 output_u32(ctx, SpvStorageClassOutput);
                 pop_output(ctx);
-
-                output_spvname(ctx, r->spirv.iddecl, varname);
-
                 break;
             case REG_TYPE_DEPTHOUT:
                 // maps to BuiltIn FragDepth
@@ -10005,9 +9996,7 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                 output_u32(ctx, SpvStorageClassOutput);
                 pop_output(ctx);
 
-                output_spvname(ctx, r->spirv.iddecl, varname);
                 output_spvbuiltin(ctx, r->spirv.iddecl, SpvBuiltInFragDepth);
-
                 break;
             case REG_TYPE_TEXTURE:
             case REG_TYPE_INPUT:
@@ -10020,9 +10009,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                 output_u32(ctx, r->spirv.iddecl);
                 output_u32(ctx, SpvStorageClassInput);
                 pop_output(ctx);
-
-                output_spvname(ctx, r->spirv.iddecl, varname);
-
                 break;
             default:
                 fail(ctx, "unknown pixel shader attribute register");
@@ -10033,6 +10019,8 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
     {
         fail(ctx, "Unknown shader type");  // state machine should catch this.
     } // else
+
+    output_spv_regname(ctx, r->spirv.iddecl, regtype, regnum);
 } // emit_SPIRV_attribute
 
 static void emit_SPIRV_finalize(Context *ctx)
