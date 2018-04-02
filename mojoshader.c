@@ -292,12 +292,18 @@ typedef struct Context
             uint32 idbool;
             uint32 idtrue;
             uint32 idfalse;
+
             uint32 idfloat;
             uint32 idint;
             uint32 iduint;
             uint32 idvec4;
             uint32 idivec4;
             uint32 idvec3;
+
+            uint32 idimage2d;
+            uint32 idimage3d;
+            uint32 idimagecube;
+
             uint32 idptrvec4u;
             uint32 idptrivec4u;
             uint32 idptrvec4i;
@@ -307,6 +313,10 @@ typedef struct Context
             uint32 idptrvec4p;
             uint32 idptrivec4p;
             uint32 idptrfloato;
+
+            uint32 idptrimage2d;
+            uint32 idptrimage3d;
+            uint32 idptrimagecube;
         } types;
         struct {
             ComponentList f;
@@ -9031,6 +9041,54 @@ static uint32 spv_getvec3(Context *ctx)
     return ctx->spirv.types.idvec3 = id;
 } // spv_getvec4
 
+static uint32 _spv_getimage(Context *ctx, uint32 *cached, SpvDim dim)
+{
+    if (*cached != 0)
+    {
+        return *cached;
+    } // if
+
+    uint32 image_id = spv_bumpid(ctx);
+    uint32 sampled_image_id = spv_bumpid(ctx);
+    uint32 fid = spv_getfloat(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
+
+    output_spvop(ctx, SpvOpTypeImage, 9);
+    output_id(ctx, image_id); // result id
+    output_id(ctx, fid); // sampled type id
+    output_u32(ctx, dim); // texture dim
+    output_u32(ctx, 0); // not a depth image
+    output_u32(ctx, 0); // non-arrayed content
+    output_u32(ctx, 0); // no multi-sampling
+    output_u32(ctx, 1); // this will be used with a sampler
+    output_u32(ctx, SpvImageFormatUnknown);
+
+    output_spvop(ctx, SpvOpTypeSampledImage, 3);
+    output_id(ctx, sampled_image_id);
+    output_id(ctx, image_id);
+
+    pop_output(ctx);
+
+    *cached = sampled_image_id;
+    return sampled_image_id;
+} // _spv_getimage
+
+static uint32 spv_getimage2d(Context *ctx)
+{
+    return _spv_getimage(ctx, &ctx->spirv.types.idimage2d, SpvDim2D);
+} // spv_getimage2d
+
+static uint32 spv_getimage3d(Context *ctx)
+{
+    return _spv_getimage(ctx, &ctx->spirv.types.idimage3d, SpvDim3D);
+} // spv_getimage2d
+
+static uint32 spv_getimagecube(Context *ctx)
+{
+    return _spv_getimage(ctx, &ctx->spirv.types.idimagecube, SpvDimCube);
+} // spv_getimage2d
+
 #define SPV_MAKE_GETPTR(_var, _from, _storageclass) \
     static uint32 spv_get ## _var(Context *ctx) \
     { \
@@ -9059,6 +9117,10 @@ SPV_MAKE_GETPTR(ptrvec4p, vec4, Private);
 SPV_MAKE_GETPTR(ptrivec4p, ivec4, Private);
 
 SPV_MAKE_GETPTR(ptrfloato, float, Output);
+
+SPV_MAKE_GETPTR(ptrimage2d, image2d, Uniform);
+SPV_MAKE_GETPTR(ptrimage3d, image3d, Uniform);
+SPV_MAKE_GETPTR(ptrimagecube, imagecube, Uniform);
 
 #undef SPV_MAKE_GETPTR
 
