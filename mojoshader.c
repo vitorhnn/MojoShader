@@ -9675,14 +9675,10 @@ static void emit_SPIRV_start(Context *ctx, const char *profilestr)
 
     memset(&(ctx->spirv), '\0', sizeof(ctx->spirv));
 
-    push_output(ctx, &ctx->mainline_intro);
-
     ctx->spirv.idmain = spv_bumpid(ctx);
 
     // calls spv_getvoid as well
     spv_getfuncv(ctx);
-
-    pop_output(ctx);
 
     // slap the function declaration itself in mainline_top, so we can do type
     // declaration in mainline_intro (= before this in the output)
@@ -9715,11 +9711,6 @@ static void emit_SPIRV_phase(Context *ctx){
 
 static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
 {
-    char varname[64];
-
-    // for OpName
-    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
-
     RegisterList *r = reglist_find(&ctx->used_registers, regtype, regnum);
 
     // TODO: If the SSA id for this register is still 0 by this point, that means no instructions actually
@@ -9750,6 +9741,8 @@ static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
             output_u32(ctx, SpvStorageClassPrivate);
             pop_output(ctx);
 
+            char varname[64];
+            get_SPIRV_varname_in_buf(ctx, r->regtype, r->regnum, varname, sizeof(varname));
             output_spvname(ctx, r->spirv.iddecl, varname);
             break;
         }
@@ -9767,11 +9760,6 @@ static void emit_SPIRV_const_array(Context *ctx,
 static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
                                const VariableList *var)
 {
-    char varname[64];
-
-    // for OpName
-    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
-
     RegisterList *r = reglist_find(&ctx->uniforms, regtype, regnum);
 
     // TODO: If the SSA id for this register is still 0 by this point, that means no instructions actually
@@ -9797,9 +9785,11 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
                 output_spvop(ctx, SpvOpVariable, 4);
                 output_id(ctx, tid);
                 output_id(ctx, r->spirv.iddecl);
-                output_u32(ctx, SpvStorageClassInput);
+                output_u32(ctx, SpvStorageClassUniform);
                 pop_output(ctx);
 
+                char varname[64];
+                get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
                 output_spvname(ctx, r->spirv.iddecl, varname);
                 break;
             }
@@ -9977,9 +9967,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
     {
         fail(ctx, "Unknown shader type");  // state machine should catch this.
     } // else
-
-    r->usage = usage;
-
 } // emit_SPIRV_attribute
 
 static void emit_SPIRV_finalize(Context *ctx)
@@ -10041,12 +10028,7 @@ static void emit_SPIRV_finalize(Context *ctx)
             r = spv_getreg(ctx, p->regtype, p->regnum);
             get_SPIRV_varname_in_buf(ctx, p->regtype, p->regnum, varname, sizeof (varname));
             if (r) {
-                //fprintf(stderr, "r=%s, p_id=%u, r_id=%u\n", varname, p->spirv.iddecl, r->spirv.iddecl);
-                if (r->spirv.iddecl) {
-                    output_u32(ctx, r->spirv.iddecl);
-                } else {
-                    failf(ctx, "attribute register %s has id 0", varname);
-                }
+                output_id(ctx, r->spirv.iddecl);
             } else {
                 failf(
                     ctx,
@@ -10068,24 +10050,6 @@ static void emit_SPIRV_finalize(Context *ctx)
 
     pop_output(ctx);
 
-    {
-        ComponentList *cl = &ctx->spirv.cl.f;
-        while (cl) {
-            fprintf(stderr, "cl.f:%p v:%f id:%u next:%p\n", cl, cl->v.f, cl->id, cl->next);
-            cl = cl->next;
-        }
-        cl = &ctx->spirv.cl.i;
-        while (cl) {
-            fprintf(stderr, "cl.i:%p v:%d id:%u next:%p\n", cl, cl->v.i, cl->id, cl->next);
-            cl = cl->next;
-        }
-        cl = &ctx->spirv.cl.u;
-        while (cl) {
-            fprintf(stderr, "cl.u:%p v:%u id:%u next:%p\n", cl, cl->v.u, cl->id, cl->next);
-            cl = cl->next;
-        }
-    }
-
     componentlist_free(ctx, ctx->spirv.cl.f.next);
     componentlist_free(ctx, ctx->spirv.cl.i.next);
     componentlist_free(ctx, ctx->spirv.cl.u.next);
@@ -10100,7 +10064,6 @@ static void emit_SPIRV_DEF(Context *ctx)
 {
     RegisterList *rl;
     uint32 val0, val1, val2, val3, idv4;
-    char varname[64];
     const float *raw = (const float *) ctx->dwords;
 
     rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
@@ -10123,16 +10086,12 @@ static void emit_SPIRV_DEF(Context *ctx)
     output_u32(ctx, val2);
     output_u32(ctx, val3);
     pop_output(ctx);
-
-    get_SPIRV_varname_in_buf(ctx, rl->regtype, rl->regnum, varname, sizeof (varname));
-    output_spvname(ctx, rl->spirv.iddecl, varname);
 } // emit_SPIRV_DEF
 
 static void emit_SPIRV_DEFI(Context *ctx)
 {
     RegisterList *rl;
     uint32 val0, val1, val2, val3, idiv4;
-    char varname[64];
     const int *raw = (const int *) ctx->dwords;
 
     rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
@@ -10155,22 +10114,13 @@ static void emit_SPIRV_DEFI(Context *ctx)
     output_u32(ctx, val2);
     output_u32(ctx, val3);
     pop_output(ctx);
-
-    get_SPIRV_varname_in_buf(ctx, rl->regtype, rl->regnum, varname, sizeof (varname));
-    output_spvname(ctx, rl->spirv.iddecl, varname);
 } // emit_SPIRV_DEFI
 
 static void emit_SPIRV_DEFB(Context *ctx)
 {
-    RegisterList *rl;
-    char varname[64];
-
-    rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
+    RegisterList *rl = spv_getreg(ctx, ctx->dest_arg.regtype, ctx->dest_arg.regnum);
     rl->spirv.iddecl = ctx->dwords[0] ? spv_gettrue(ctx) : spv_getfalse(ctx);
     rl->spirv.iduse = rl->spirv.iddecl;
-
-    get_SPIRV_varname_in_buf(ctx, rl->regtype, rl->regnum, varname, sizeof (varname));
-    output_spvname(ctx, rl->spirv.iddecl, varname);
 } // emit_SPIRV_DEFB
 
 static void emit_SPIRV_DCL(Context *ctx)
@@ -10185,14 +10135,6 @@ static void emit_SPIRV_DCL(Context *ctx)
     // emit_SPIRV_attribute is called after instructions are emitted,
     // so we generate the id here so it can be used in instructions
     reg->spirv.iddecl = spv_bumpid(ctx);
-    // TODO: Is it alright to leave iduse = 0?
-
-    char varname[64];
-
-    // for OpName
-    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof (varname));
-
-    output_spvname(ctx, reg->spirv.iddecl, varname);
 } // emit_SPIRV_DCL
 
 static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src0, uint32 src1)
