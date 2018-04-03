@@ -298,6 +298,7 @@ typedef struct Context
             uint32 iduint;
             uint32 idvec4;
             uint32 idivec4;
+            uint32 idbvec4;
             uint32 idvec3;
 
             uint32 idimage2d;
@@ -9040,7 +9041,27 @@ static uint32 spv_getivec4(Context *ctx)
     output_u32(ctx, 4);
     pop_output(ctx);
     return ctx->spirv.types.idivec4 = id;
-} // spv_getvec4i
+} // spv_getivec4
+
+static uint32 spv_getbvec4(Context *ctx)
+{
+    uint32 id, iid;
+    if (ctx->spirv.types.idbvec4)
+    {
+        return ctx->spirv.types.idbvec4;
+    } // if
+
+    iid = spv_getbool(ctx);
+    id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline_intro);
+    output_spvop(ctx, SpvOpTypeVector, 4);
+    output_u32(ctx, id);
+    output_u32(ctx, iid);
+    output_u32(ctx, 4);
+    pop_output(ctx);
+    return ctx->spirv.types.idbvec4 = id;
+} // spv_getbvec4
 
 static uint32 spv_getvec3(Context *ctx)
 {
@@ -9260,6 +9281,19 @@ static uint32 spv_getscalaru(Context *ctx, uint32 v)
     cl->id = spv_emitscalar(ctx, cl, MOJOSHADER_ATTRIBUTE_UINT);
     return cl->id;
 } // spv_getscalaru
+
+// Make a 4-channel vector with a value broadcast across all channels. Roughly equivalent to `vec4(value)` in GLSL
+static uint32 spv_vectorbroadcast(Context *ctx, uint32 tid, uint32 value)
+{
+    uint32 result = spv_bumpid(ctx);
+    push_output(ctx, &ctx->mainline);
+    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
+    output_id(ctx, tid);
+    output_id(ctx, result);
+    for (int i = 0; i < 4; i++) output_id(ctx, value);
+    pop_output(ctx);
+    return result;
+}
 
 static void spv_check_read_reg_id(Context *ctx, RegisterList *r)
 {
@@ -9781,8 +9815,6 @@ static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
         r->spirv.iddecl = spv_bumpid(ctx);
     } // if
 
-    uint32 type;
-
     switch (regtype)
     {
         case REG_TYPE_ADDRESS:
@@ -9810,11 +9842,11 @@ static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
     }
 }
 
-static void emit_SPIRV_array(Context *ctx, VariableList *var){}
+static void emit_SPIRV_array(Context *ctx, VariableList *var){ fail(ctx, "arrays not implemented"); }
 
 static void emit_SPIRV_const_array(Context *ctx,
                                    const struct ConstantsList *constslist,
-                                   int base, int size){}
+                                   int base, int size){ fail(ctx, "const arrays not implemented"); }
 static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
                                const VariableList *var)
 {
@@ -9830,8 +9862,6 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
 
     if (var == NULL)
     {
-        uint32 type;
-
         switch (regtype)
         {
             case REG_TYPE_CONST:
@@ -9858,7 +9888,7 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
 
     else
     {
-        const int arraybase = var->index;
+        // const int arraybase = var->index;
         if (var->constant)
         {
             fail(ctx, "const array not implemented");
@@ -9938,7 +9968,7 @@ static void spv_link_vs_attributes(Context *ctx, uint32 id, MOJOSHADER_usage usa
     } //  else
 } // spv_link_vs_attributes
 
-static uint32 spv_link_ps_attributes(Context *ctx, uint32 id, RegisterType regtype, MOJOSHADER_usage usage, int index)
+static void spv_link_ps_attributes(Context *ctx, uint32 id, RegisterType regtype, MOJOSHADER_usage usage, int index)
 {
     switch (regtype) {
         case REG_TYPE_COLOROUT:
@@ -10013,11 +10043,7 @@ static uint32 spv_link_ps_attributes(Context *ctx, uint32 id, RegisterType regty
                     output_id(ctx, spv_getscalarf(ctx, 0.0f));
 
                     // vec4(gl_FrontFacing ? 1.0 : 0.0)
-                    uint32 frontfacing_vec4_id = spv_bumpid(ctx);
-                    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
-                    output_id(ctx, vec4_tid);
-                    output_id(ctx, frontfacing_vec4_id);
-                    for (int i = 0; i < 4; i++) output_id(ctx, frontfacing_float_id);
+                    uint32 frontfacing_vec4_id = spv_vectorbroadcast(ctx, vec4_tid, frontfacing_float_id);
 
                     // vFace = vec4(gl_FrontFacing ? 1.0 : 0.0);
                     output_spvop(ctx, SpvOpStore, 3);
@@ -10360,13 +10386,8 @@ static void _emit_SPIRV_dotproduct(Context *ctx, uint32 src0, uint32 src1)
     output_id(ctx, src0);
     output_id(ctx, src1);
 
-    // Broadcast scalar result across all channels of a vec4i
-    uint32 vector_result = spv_bumpid(ctx);
-    uint32 vec4_tid = spv_getvec4(ctx);
-    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
-    output_id(ctx, vec4_tid);
-    output_id(ctx, vector_result);
-    for (int i = 0; i < 4; i++) output_id(ctx, scalar_result);
+    // Broadcast scalar result across all channels of a vec4
+    uint32 vector_result = spv_vectorbroadcast(ctx, spv_getvec4(ctx), scalar_result);
 
     pop_output(ctx);
 
@@ -10642,26 +10663,21 @@ MAKE_SPIRV_EMITTER_DS(LOG, {
     // LOG(x) := (x == vec4(0.0)) ? vec4(FLT_MAX) : log2(abs(x))
 
     // abs(x)
-    uint32 abs_src0_id = spv_bumpid(ctx);
+    uint32 abs_src0 = spv_bumpid(ctx);
     output_spvop(ctx, SpvOpExtInst, 5 + 1);
-    output_id(ctx, tid);
-    output_id(ctx, abs_src0_id);
+    output_id(ctx, rtid);
+    output_id(ctx, abs_src0);
     output_id(ctx, spv_getext(ctx));
     output_u32(ctx, GLSLstd450FAbs);
     output_id(ctx, src0);
 
     // vec4(0.0)
-    uint32 vec4_zero = spv_bumpid(ctx);
-    uint32 zero = spv_getscalarf(ctx, 0.0f);
-    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
-    output_id(ctx, tid);
-    output_id(ctx, vec4_zero);
-    for (int i = 0; i < 4; i++) output_id(ctx, zero);
+    uint32 vec4_zero = spv_vectorbroadcast(ctx, rtid, zero);
 
     // x == vec4(0.0)
     uint32 is_zero = spv_bumpid(ctx);
     output_spvop(ctx, SpvOpFOrdEqual, 5);
-    output_id(ctx, tid);
+    output_id(ctx, spv_getbvec4(ctx));
     output_id(ctx, is_zero);
     output_id(ctx, abs_src0);
     output_id(ctx, vec4_zero);
@@ -10669,27 +10685,58 @@ MAKE_SPIRV_EMITTER_DS(LOG, {
     // log2(abs(x))
     uint32 log2_of_nonzero = spv_bumpid(ctx);
     output_spvop(ctx, SpvOpExtInst, 5 + 1);
-    output_id(ctx, tid);
+    output_id(ctx, rtid);
     output_id(ctx, log2_of_nonzero);
     output_id(ctx, spv_getext(ctx));
     output_u32(ctx, GLSLstd450Log2);
-    output_id(ctx, abs_src0_id);
+    output_id(ctx, abs_src0);
 
     // vec4(FLT_MAX)
-    uint32 vec4_flt_max = spv_bumpid(ctx);
-    uint32 flt_max = spv_getscalarf(ctx, FLT_MAX);
-    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
-    output_id(ctx, tid);
-    output_id(ctx, vec4_flt_max);
-    for (int i = 0; i < 4; i++) output_id(ctx, flt_max);
+    uint32 vec4_flt_max = spv_vectorbroadcast(ctx, rtid, spv_getscalarf(ctx, FLT_MAX));
 
     // (x == vec4(0.0)) ? vec4(FLT_MAX) : log2(abs(x))
     output_spvop(ctx, SpvOpSelect, 6);
-    output_id(ctx, tid);
+    output_id(ctx, rtid);
     output_id(ctx, result);
     output_id(ctx, is_zero);
     output_id(ctx, vec4_flt_max);
     output_id(ctx, log2_of_nonzero);
+})
+
+#define MAKE_SPIRV_EMITTER_DSSS(name, emit_spvop) \
+    static void emit_SPIRV_ ## name (Context *ctx) \
+    { \
+        uint32 src0 = spv_load_srcarg_full(ctx, 0); \
+        uint32 src1 = spv_load_srcarg_full(ctx, 1); \
+        uint32 src2 = spv_load_srcarg_full(ctx, 2); \
+        uint32 result = spv_bumpid(ctx); \
+        uint32 rtid = spv_getvec4(ctx); \
+        \
+        push_output(ctx, &ctx->mainline); \
+        \
+        emit_spvop; \
+        \
+        pop_output(ctx); \
+        \
+        spv_assign_destarg(ctx, result); \
+    }
+
+MAKE_SPIRV_EMITTER_DSSS(CMP, {
+    uint32 vec4_zero = spv_vectorbroadcast(ctx, rtid, spv_getscalarf(ctx, 0.0f));
+
+    uint32 ge_zero = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpFUnordGreaterThanEqual, 5);
+    output_id(ctx, spv_getbvec4(ctx));
+    output_id(ctx, ge_zero);
+    output_id(ctx, src0);
+    output_id(ctx, vec4_zero);
+
+    output_spvop(ctx, SpvOpSelect, 6);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, ge_zero);
+    output_id(ctx, src1);
+    output_id(ctx, src2);
 })
 
 static void emit_SPIRV_LRP(Context *ctx)
@@ -10911,7 +10958,7 @@ static void emit_SPIRV_TEXLD(Context *ctx)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SLT)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGE)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(EXP)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOG)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LOG)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LIT)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DST)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LRP)
@@ -10969,7 +11016,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X2DEPTH)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXDP3)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXM3X3)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(TEXDEPTH)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CMP)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(CMP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BEM)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DP2ADD)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DSX)
