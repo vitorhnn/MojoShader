@@ -8680,6 +8680,7 @@ static void emit_ARB1_TEXLD(Context *ctx)
 
 #include "spirv/spirv.h"
 #include "spirv/GLSL.std.450.h"
+#include <float.h>
 
 static uint32 spv_bumpid(Context *ctx)
 {
@@ -10635,6 +10636,60 @@ MAKE_SPIRV_EMITTER_DS(FRC, {
     output_id(ctx, spv_getext(ctx));
     output_id(ctx, GLSLstd450Fract);
     output_id(ctx, src0);
+})
+
+MAKE_SPIRV_EMITTER_DS(LOG, {
+    // LOG(x) := (x == vec4(0.0)) ? vec4(FLT_MAX) : log2(abs(x))
+
+    // abs(x)
+    uint32 abs_src0_id = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, tid);
+    output_id(ctx, abs_src0_id);
+    output_id(ctx, spv_getext(ctx));
+    output_u32(ctx, GLSLstd450FAbs);
+    output_id(ctx, src0);
+
+    // vec4(0.0)
+    uint32 vec4_zero = spv_bumpid(ctx);
+    uint32 zero = spv_getscalarf(ctx, 0.0f);
+    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
+    output_id(ctx, tid);
+    output_id(ctx, vec4_zero);
+    for (int i = 0; i < 4; i++) output_id(ctx, zero);
+
+    // x == vec4(0.0)
+    uint32 is_zero = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpFOrdEqual, 5);
+    output_id(ctx, tid);
+    output_id(ctx, is_zero);
+    output_id(ctx, abs_src0);
+    output_id(ctx, vec4_zero);
+
+    // log2(abs(x))
+    uint32 log2_of_nonzero = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, tid);
+    output_id(ctx, log2_of_nonzero);
+    output_id(ctx, spv_getext(ctx));
+    output_u32(ctx, GLSLstd450Log2);
+    output_id(ctx, abs_src0_id);
+
+    // vec4(FLT_MAX)
+    uint32 vec4_flt_max = spv_bumpid(ctx);
+    uint32 flt_max = spv_getscalarf(ctx, FLT_MAX);
+    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
+    output_id(ctx, tid);
+    output_id(ctx, vec4_flt_max);
+    for (int i = 0; i < 4; i++) output_id(ctx, flt_max);
+
+    // (x == vec4(0.0)) ? vec4(FLT_MAX) : log2(abs(x))
+    output_spvop(ctx, SpvOpSelect, 6);
+    output_id(ctx, tid);
+    output_id(ctx, result);
+    output_id(ctx, is_zero);
+    output_id(ctx, vec4_flt_max);
+    output_id(ctx, log2_of_nonzero);
 })
 
 static void emit_SPIRV_LRP(Context *ctx)
