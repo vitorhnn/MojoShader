@@ -8824,7 +8824,9 @@ static void output_spvname(Context *ctx, uint32 id, const char *str)
 static void output_spv_regname(Context *ctx, uint32 id, RegisterType regtype, int regnum)
 {
     char varname[64];
-    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname, sizeof(varname));
+    snprintf(varname, sizeof(varname), "%s_", ctx->shader_type_str);
+    size_t offset = strlen(varname);
+    get_SPIRV_varname_in_buf(ctx, regtype, regnum, varname + offset, sizeof(varname) - offset);
     output_spvname(ctx, id, varname);
 } // output_spv_regname
 
@@ -8841,6 +8843,16 @@ static void output_spvbuiltin(Context *ctx, uint32 id, SpvBuiltIn builtin)
     output_u32(ctx, builtin);
     pop_output(ctx);
 } // output_spvbuiltin
+
+static void output_spvlocation(Context *ctx, uint32 id, uint32 loc)
+{
+    push_output(ctx, &ctx->helpers);
+    output_spvop(ctx, SpvOpDecorate, 4);
+    output_u32(ctx, id);
+    output_u32(ctx, SpvDecorationLocation);
+    output_u32(ctx, loc);
+    pop_output(ctx);
+} // output_spvlocation
 
 static uint32 spv_getvoid(Context *ctx)
 {
@@ -9885,6 +9897,142 @@ static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype, int t
     output_spv_regname(ctx, result, REG_TYPE_SAMPLER, stage);
 } // emit_SPIRV_sampler
 
+static void spv_link_vs_attributes(Context *ctx, uint32 id, MOJOSHADER_usage usage, int index)
+{
+    if (!shader_version_atleast(ctx, 3, 0))
+        switch (usage)
+        {
+            case MOJOSHADER_USAGE_POSITION:
+                assert(index == 0);
+                output_spvbuiltin(ctx, id, SpvBuiltInPosition);
+                break;
+            case MOJOSHADER_USAGE_FOG:
+                assert(index == 0);
+                fail(ctx, "MOJOSHADER_USAGE_FOG is currently unimplemented in SPIRV, vFog attribute will be ignored");
+                break;
+            case MOJOSHADER_USAGE_POINTSIZE:
+                assert(index == 0);
+                output_spvbuiltin(ctx, id, SpvBuiltInPointSize);
+                break;
+            case MOJOSHADER_USAGE_COLOR:
+                assert(index < 2);
+                // locations [0,1] are for USAGE_COLOR
+                output_spvlocation(ctx, id, 0 + index); // Keep in sync with spv_link_ps_attributes()
+                break;
+            case MOJOSHADER_USAGE_TEXCOORD:
+                assert(index < 10);
+                // locations [2,11] are for USAGE_TEXCOORD
+                output_spvlocation(ctx, id, 2 + index); // Keep in sync with spv_link_ps_attributes()
+                break;
+            default:
+                failf(ctx, "unexpected attribute usage %d for shader model < 3.0", usage);
+                break;
+        } // switch
+    else
+    {
+        assert(index < 10);
+        // usage is allowed to be anything here, it is a semantic(?)
+        // we use locations [0,9]
+        output_spvlocation(ctx, id, index);
+    } //  else
+} // spv_link_vs_attributes
+
+static uint32 spv_link_ps_attributes(Context *ctx, uint32 id, RegisterType regtype, MOJOSHADER_usage usage, int index)
+{
+    switch (regtype) {
+        case REG_TYPE_COLOROUT:
+            // nothing to do for color, OpenGL should hook it up automatically??
+            break;
+        case REG_TYPE_INPUT: // v# (MOJOSHADER_USAGE_COLOR aka `oC#` in vertex shader)
+            if (shader_version_atleast(ctx, 3, 0))
+            {
+                output_spvlocation(ctx, id, index);
+            }
+            else
+            {
+                assert(index < 2);
+                output_spvlocation(ctx, id, 0 + index); // Keep in sync with spv_link_vs_attributes()
+            }
+            break;
+        case REG_TYPE_TEXTURE: // t# (MOJOSHADER_USAGE_TEXCOORD aka `oT#` in vertex shader)
+            assert(index < 10);
+            output_spvlocation(ctx, id, 2 + index); // Keep in sync with spv_link_vs_attributes()
+            break;
+        case REG_TYPE_DEPTHOUT:
+            output_spvbuiltin(ctx, id, SpvBuiltInFragDepth);
+            break;
+        case REG_TYPE_MISCTYPE:
+            // inputs
+            switch ((MiscTypeType)index)
+            {
+                case MISCTYPE_TYPE_POSITION: // vPos
+                    // In SM3.0 vPos only has x and y defined, but we should be fine to leave the z and w attributes in
+                    // that SpvBuiltInFragCoord gives
+                    output_spvbuiltin(ctx, id, SpvBuiltInFragCoord);
+                    break;
+                case MISCTYPE_TYPE_FACE: // vFace
+                {
+                    // The much more wordy equivalent of:
+                    // bool gl_FrontFacing = <compiler magic builtin>;
+                    // vec4 vFace;
+                    // vFace = vec4(gl_FrontFacing ? 1.0 : 0.0);
+
+                    uint32 vec4_tid = spv_getptrvec4i(ctx);
+
+                    push_output(ctx, &ctx->mainline_intro);
+
+                    // declare ptr to bool (I don't expect to need this type again so haven't cached it in Context)
+                    uint32 bool_tid = spv_bumpid(ctx);
+                    output_spvop(ctx, SpvOpTypePointer, 4);
+                    output_u32(ctx, bool_tid);
+                    output_u32(ctx, SpvStorageClassPrivate);
+                    output_u32(ctx, spv_getbool(ctx));
+
+                    // bool gl_FrontFacing = <compiler magic builtin>;
+                    uint32 frontfacing_id = spv_bumpid(ctx);
+                    output_spvop(ctx, SpvOpVariable, 4);
+                    output_u32(ctx, bool_tid);
+                    output_u32(ctx, frontfacing_id);
+                    output_u32(ctx, SpvStorageClassInput);
+                    output_spvbuiltin(ctx, frontfacing_id, SpvBuiltInFrontFacing);
+
+                    // vec4 vFace;
+                    output_spvop(ctx, SpvOpVariable, 4);
+                    output_u32(ctx, vec4_tid);
+                    output_u32(ctx, id);
+                    output_u32(ctx, SpvStorageClassPrivate);
+
+                    // gl_FrontFacing ? 1.0 : 0.0
+                    uint32 frontfacing_float_id = spv_bumpid(ctx);
+                    output_spvop(ctx, SpvOpSelect, 6);
+                    output_id(ctx, vec4_tid);
+                    output_id(ctx, frontfacing_float_id);
+                    output_id(ctx, frontfacing_id);
+                    output_id(ctx, spv_getscalarf(ctx, 1.0f));
+                    output_id(ctx, spv_getscalarf(ctx, 0.0f));
+
+                    // vec4(gl_FrontFacing ? 1.0 : 0.0)
+                    uint32 frontfacing_vec4_id = spv_bumpid(ctx);
+                    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
+                    output_id(ctx, vec4_tid);
+                    output_id(ctx, frontfacing_vec4_id);
+                    for (int i = 0; i < 4; i++) output_id(ctx, frontfacing_float_id);
+
+                    // vFace = vec4(gl_FrontFacing ? 1.0 : 0.0);
+                    output_spvop(ctx, SpvOpStore, 3);
+                    output_id(ctx, id);
+                    output_id(ctx, frontfacing_vec4_id);
+
+                    pop_output(ctx);
+                    break;
+                } // case
+            } // switch
+            break;
+        default:
+            fail(ctx, "unknown pixel shader attribute register");
+    }
+} // spv_link_ps_attributes
+
 static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                                  MOJOSHADER_usage usage, int index, int wmask,
                                  int flags)
@@ -9934,34 +10082,37 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
             } // else if
         } // if
 
-        if (regtype == REG_TYPE_INPUT)
+        switch (regtype)
         {
-            push_output(ctx, &ctx->mainline_intro);
-            tid = spv_getptrvec4i(ctx);
+            case REG_TYPE_INPUT:
+                push_output(ctx, &ctx->mainline_intro);
+                tid = spv_getptrvec4i(ctx);
 
-            output_spvop(ctx, SpvOpVariable, 4);
-            output_u32(ctx, tid);
-            output_u32(ctx, r->spirv.iddecl);
-            output_u32(ctx, SpvStorageClassInput);
-            pop_output(ctx);
-        } // if
+                output_spvop(ctx, SpvOpVariable, 4);
+                output_u32(ctx, tid);
+                output_u32(ctx, r->spirv.iddecl);
+                output_u32(ctx, SpvStorageClassInput);
+                pop_output(ctx);
+                break;
 
-        else if (regtype == REG_TYPE_OUTPUT)
-        {
-            push_output(ctx, &ctx->mainline_intro);
-            tid = spv_getptrvec4o(ctx);
+            case REG_TYPE_OUTPUT:
+            {
+                push_output(ctx, &ctx->mainline_intro);
+                tid = spv_getptrvec4o(ctx);
 
-            output_spvop(ctx, SpvOpVariable, 4);
-            output_u32(ctx, tid);
-            output_u32(ctx, r->spirv.iddecl);
-            output_u32(ctx, SpvStorageClassOutput);
-            pop_output(ctx);
-        } // else if
+                output_spvop(ctx, SpvOpVariable, 4);
+                output_u32(ctx, tid);
+                output_u32(ctx, r->spirv.iddecl);
+                output_u32(ctx, SpvStorageClassOutput);
+                pop_output(ctx);
 
-        else
-        {
-            fail(ctx, "unknown vertex shader attribute register");
-        } // else
+                spv_link_vs_attributes(ctx, r->spirv.iddecl, usage, index);
+                break;
+            }
+
+            default:
+                fail(ctx, "unknown vertex shader attribute register");
+        } // switch
     } // if
 
     else if (shader_is_pixel(ctx))
@@ -9974,6 +10125,7 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
             return;
         } // if
 
+        spv_link_ps_attributes(ctx, r->spirv.iddecl, regtype, usage, index);
         switch (regtype) {
             case REG_TYPE_COLOROUT:
                 push_output(ctx, &ctx->mainline_intro);
@@ -9995,12 +10147,16 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                 output_u32(ctx, r->spirv.iddecl);
                 output_u32(ctx, SpvStorageClassOutput);
                 pop_output(ctx);
-
-                output_spvbuiltin(ctx, r->spirv.iddecl, SpvBuiltInFragDepth);
                 break;
+            case REG_TYPE_MISCTYPE:
+                // SpvBuiltInFrontFacing is a input bool, and for the DX bytecode we need to map it to
+                // a float that's either -1.0 or 1.0. This takes place in spv_link_ps_attributes() so
+                // don't create an input variable for it here.
+                if ((MiscTypeType)index == MISCTYPE_TYPE_FACE)
+                    break;
+                // else fallthrough
             case REG_TYPE_TEXTURE:
             case REG_TYPE_INPUT:
-            case REG_TYPE_MISCTYPE:
                 push_output(ctx, &ctx->mainline_intro);
                 tid = spv_getptrvec4i(ctx);
 
