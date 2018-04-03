@@ -10042,6 +10042,8 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
 
     ctx->spirv.inoutcount += 1;
 
+    output_spv_regname(ctx, r->spirv.iddecl, regtype, regnum);
+
     if (shader_is_vertex(ctx))
     {
         // pre-vs3 output registers.
@@ -10175,8 +10177,6 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
     {
         fail(ctx, "Unknown shader type");  // state machine should catch this.
     } // else
-
-    output_spv_regname(ctx, r->spirv.iddecl, regtype, regnum);
 } // emit_SPIRV_attribute
 
 static void emit_SPIRV_finalize(Context *ctx)
