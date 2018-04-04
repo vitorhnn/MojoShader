@@ -10700,7 +10700,7 @@ MAKE_SPIRV_EMITTER_DS(LOG, {
     output_id(ctx, src0);
 
     // vec4(0.0)
-    uint32 vec4_zero = spv_vectorbroadcast(ctx, rtid, zero);
+    uint32 vec4_zero = spv_vectorbroadcast(ctx, rtid, spv_getscalarf(ctx, 0.0f));
 
     // x == vec4(0.0)
     uint32 is_zero = spv_bumpid(ctx);
