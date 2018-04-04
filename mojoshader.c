@@ -9083,6 +9083,18 @@ static uint32 spv_getvec3(Context *ctx)
     return ctx->spirv.types.idvec3 = id;
 } // spv_getvec4
 
+static uint32 spv_makeundef(Context *ctx, uint32 tid)
+{
+    uint32 id = spv_bumpid(ctx);
+
+    push_output(ctx, &ctx->mainline);
+    output_spvop(ctx, SpvOpUndef, 3);
+    output_u32(ctx, id);
+    output_u32(ctx, tid);
+    pop_output(ctx);
+    return id;
+} // spv_getundef
+
 static uint32 _spv_getimage(Context *ctx, uint32 *cached, SpvDim dim)
 {
     if (*cached != 0)
@@ -10719,6 +10731,59 @@ MAKE_SPIRV_EMITTER_DS(LOG, {
     output_id(ctx, log2_of_nonzero);
 });
 
+MAKE_SPIRV_EMITTER_DS(SINCOS, {
+    // For vs_2_0 and vs_2_x this instruction also has a src1 and src2 which provide a couple of constants
+    // We just ignore these in any case
+
+    // float V = src0.x;
+    uint32 V = spv_bumpid(ctx);
+    uint32 float_id = spv_getfloat(ctx);
+    output_spvop(ctx, SpvOpCompositeExtract, 4 + 1);
+    output_id(ctx, float_id);
+    output_id(ctx, V);
+    output_id(ctx, src0);
+    output_u32(ctx, 0);
+
+    int writemask = ctx->dest_arg.writemask;
+    uint32 undef = spv_makeundef(ctx, spv_getfloat(ctx));
+
+    uint32 scalar_sin;
+    if (writemask & 1) // .x = cos(V)
+    {
+        scalar_sin = spv_bumpid(ctx);
+        output_spvop(ctx, SpvOpExtInst, 5 + 1);
+        output_id(ctx, float_id);
+        output_id(ctx, scalar_sin);
+        output_id(ctx, spv_getext(ctx));
+        output_id(ctx, GLSLstd450Sin);
+        output_id(ctx, V);
+    }
+    else
+    {
+        scalar_sin = undef;
+    }
+
+    uint32 scalar_cos;
+    if (writemask & 2) // .y = sin(V)
+    {
+        scalar_cos = spv_bumpid(ctx);
+        output_spvop(ctx, SpvOpExtInst, 5 + 1);
+        output_id(ctx, float_id);
+        output_id(ctx, scalar_cos);
+        output_id(ctx, spv_getext(ctx));
+        output_id(ctx, GLSLstd450Cos);
+        output_id(ctx, V);
+    }
+
+    output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, scalar_cos);
+    output_id(ctx, scalar_sin);
+    output_id(ctx, undef);
+    output_id(ctx, undef);
+});
+
 #define MAKE_SPIRV_EMITTER_DSSS(name, emit_spvop) \
     static void emit_SPIRV_ ## name (Context *ctx) \
     { \
@@ -10996,7 +11061,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(LABEL)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SGN)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ABS)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(NRM)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SINCOS)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(SINCOS)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(REP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDREP)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(IF)
