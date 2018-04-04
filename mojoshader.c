@@ -12118,7 +12118,7 @@ static void state_DCL(Context *ctx)
     if (ctx->instruction_count != 0)
         fail(ctx, "DCL token must come before any instructions");
 
-    else if (shader_is_vertex(ctx))
+    else if (shader_is_vertex(ctx) || shader_is_pixel(ctx))
     {
         if (regtype == REG_TYPE_SAMPLER)
             add_sampler(ctx, regnum, (TextureType) ctx->dwords[0], 0);
@@ -12134,18 +12134,6 @@ static void state_DCL(Context *ctx)
             add_attribute_register(ctx, regtype, regnum, usage, index, wmask, mods);
         } // else
     } // if
-
-    else if (shader_is_pixel(ctx))
-    {
-        if (regtype == REG_TYPE_SAMPLER)
-            add_sampler(ctx, regnum, (TextureType) ctx->dwords[0], 0);
-        else
-        {
-            const MOJOSHADER_usage usage = (MOJOSHADER_usage) ctx->dwords[0];
-            const int index = ctx->dwords[1];
-            add_attribute_register(ctx, regtype, regnum, usage, index, wmask, mods);
-        } // else
-    } // else if
 
     else
     {
