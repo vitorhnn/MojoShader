@@ -10630,6 +10630,7 @@ static void emit_SPIRV_MAD (Context *ctx)
 MAKE_SPIRV_EMITTER_DS(MOV, {
     // This wastes the SSA id allocated for result, but do I really want to ruin a function this simple
     result = src0;
+    (void)rtid; // rtid is unused
 });
 
 MAKE_SPIRV_EMITTER_DS(RCP, {
@@ -10769,10 +10770,7 @@ MAKE_SPIRV_EMITTER_DS(SINCOS, {
         output_id(ctx, GLSLstd450Sin);
         output_id(ctx, V);
     }
-    else
-    {
-        scalar_sin = undef;
-    }
+    else scalar_sin = undef;
 
     uint32 scalar_cos;
     if (writemask & 2) // .y = sin(V)
@@ -10785,6 +10783,7 @@ MAKE_SPIRV_EMITTER_DS(SINCOS, {
         output_id(ctx, GLSLstd450Cos);
         output_id(ctx, V);
     }
+    else scalar_cos = undef;
 
     output_spvop(ctx, SpvOpCompositeConstruct, 3 + 4);
     output_id(ctx, rtid);
