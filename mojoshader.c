@@ -313,6 +313,7 @@ typedef struct Context
             uint32 idptrivec4o;
             uint32 idptrvec4p;
             uint32 idptrivec4p;
+            uint32 idptrbvec4p;
             uint32 idptrfloato;
 
             uint32 idptrimage2d;
@@ -9169,6 +9170,7 @@ SPV_MAKE_GETPTR(ptrvec4o, vec4, Output);
 SPV_MAKE_GETPTR(ptrivec4o, ivec4, Output);
 SPV_MAKE_GETPTR(ptrvec4p, vec4, Private);
 SPV_MAKE_GETPTR(ptrivec4p, ivec4, Private);
+SPV_MAKE_GETPTR(ptrbvec4p, bvec4, Private);
 
 SPV_MAKE_GETPTR(ptrfloato, float, Output);
 
@@ -9347,6 +9349,7 @@ static void spv_check_write_reg_id(Context *ctx, RegisterList *r)
         switch (r->regtype)
         {
             // These registers require no declarations, so we can just create them as we see them
+            case REG_TYPE_ADDRESS:
             case REG_TYPE_TEMP:
             case REG_TYPE_RASTOUT:
             case REG_TYPE_COLOROUT:
@@ -9827,31 +9830,39 @@ static void emit_SPIRV_global(Context *ctx, RegisterType regtype, int regnum)
         r->spirv.iddecl = spv_bumpid(ctx);
     } // if
 
+    uint32 tid = 0;
     switch (regtype)
     {
-        case REG_TYPE_ADDRESS:
-        case REG_TYPE_PREDICATE:
         case REG_TYPE_LOOP:
         case REG_TYPE_LABEL:
             failf(ctx, "unimplemented regtype %d", regtype);
             return;
-        case REG_TYPE_TEMP:
-        {
-            push_output(ctx, &ctx->mainline_intro);
-            uint32 tid = spv_getptrvec4p(ctx);
-            output_spvop(ctx, SpvOpVariable, 4);
-            output_id(ctx, tid);
-            output_id(ctx, r->spirv.iddecl);
-            output_u32(ctx, SpvStorageClassPrivate);
-            pop_output(ctx);
 
-            output_spv_regname(ctx, r->spirv.iddecl, r->regtype, r->regnum);
+        case REG_TYPE_PREDICATE:
+            tid = spv_getptrbvec4p(ctx);
             break;
-        }
+
+        case REG_TYPE_ADDRESS:
+            tid = spv_getptrivec4p(ctx);
+            break;
+
+        case REG_TYPE_TEMP:
+            tid = spv_getptrvec4p(ctx);
+            break;
 
         default:
-            assert(!"Unexpected regtype in emit_SPIRV_global");
+            fail(ctx, "BUG: Unexpected regtype in emit_SPIRV_global");
+            return;
     }
+
+    push_output(ctx, &ctx->mainline_intro);
+    output_spvop(ctx, SpvOpVariable, 4);
+    output_id(ctx, tid);
+    output_id(ctx, r->spirv.iddecl);
+    output_u32(ctx, SpvStorageClassPrivate);
+    pop_output(ctx);
+
+    output_spv_regname(ctx, r->spirv.iddecl, regtype, regnum);
 }
 
 static void emit_SPIRV_array(Context *ctx, VariableList *var){ fail(ctx, "arrays not implemented"); }
@@ -10784,6 +10795,32 @@ MAKE_SPIRV_EMITTER_DS(SINCOS, {
     output_id(ctx, undef);
 });
 
+static void emit_SPIRV_MOVA(Context *ctx)
+{
+    uint32 src0 = spv_load_srcarg_full(ctx, 0);
+    uint32 result = spv_bumpid(ctx);
+    uint32 rtid = spv_getivec4(ctx);
+
+    push_output(ctx, &ctx->mainline);
+
+    uint32 rounded = spv_bumpid(ctx);
+    output_spvop(ctx, SpvOpExtInst, 5 + 1);
+    output_id(ctx, spv_getvec4(ctx));
+    output_id(ctx, rounded);
+    output_id(ctx, spv_getext(ctx));
+    output_id(ctx, GLSLstd450Round);
+    output_id(ctx, src0);
+
+    output_spvop(ctx, SpvOpConvertFToS, 4);
+    output_id(ctx, rtid);
+    output_id(ctx, result);
+    output_id(ctx, rounded);
+
+    pop_output(ctx);
+
+    spv_assign_destarg(ctx, result);
+}
+
 #define MAKE_SPIRV_EMITTER_DSSS(name, emit_spvop) \
     static void emit_SPIRV_ ## name (Context *ctx) \
     { \
@@ -11070,7 +11107,7 @@ EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ELSE)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(ENDIF)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAK)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(BREAKC)
-EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOVA)
+//EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(MOVA)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFB)
 //EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(DEFI)
 EMIT_SPIRV_OPCODE_UNIMPLEMENTED_FUNC(RESERVED)
