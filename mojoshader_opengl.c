@@ -428,8 +428,12 @@ static int impl_SPIRV_CompileShader(const MOJOSHADER_parseData *pd, GLuint *s)
 {
     GLint ok = 0;
 
+    FILE *fp = fopen(pd->mainfn, "w");
+    fwrite(pd->output, 1, pd->output_len, fp);
+    fclose(fp);
+
     const GLuint shader = ctx->glCreateShader(glsl_shader_type(pd->shader_type));
-    ctx->glShaderBinary(1, &shader, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, &pd->output, (GLsizei) pd->output_len);
+    ctx->glShaderBinary(1, &shader, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, pd->output, (GLsizei) pd->output_len);
     ctx->glSpecializeShaderARB(shader, pd->mainfn, 0, NULL, NULL); // FIXME: Spec Constants? -flibit
     ctx->glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
     if (!ok)
@@ -445,7 +449,30 @@ static int impl_SPIRV_CompileShader(const MOJOSHADER_parseData *pd, GLuint *s)
     *s = shader;
 
     return 1;
-}
+} // impl_SPIRV_CompileShader
+
+// !! FIXME: Check if this is correct. I've used ARB1 as a reference point
+static GLint impl_SPIRV_GetAttribLocation(MOJOSHADER_glProgram *program, int idx)
+{
+    return idx;
+} // impl_SPIRV_GetAttribLocation
+
+// !! FIXME: handle integer and bool uniforms
+// easiest way to do this would be reserving [16, 32] for integer, (32, 48] for boolean and (48, inf] for float
+static GLint impl_SPIRV_GetUniformLocation(MOJOSHADER_glProgram *program, MOJOSHADER_glShader *shader, int idx)
+{
+    const unsigned offset = 16; // samplers
+    switch (shader->parseData->uniforms[idx].type)
+    {
+        case MOJOSHADER_UNIFORM_FLOAT:
+            return shader->parseData->uniforms[idx].index + offset;
+        default:
+            fprintf(stderr, "only float uniforms for now");
+            abort();
+            break;
+    } // switch
+} // impl_SPIRV_GetUniformLocation
+
 #endif // SUPPORT_PROFILE_SPIRV
 
 
@@ -1509,8 +1536,8 @@ MOJOSHADER_glContext *MOJOSHADER_glCreateContext(const char *profile,
         ctx->profileCompileShader = impl_SPIRV_CompileShader;
         ctx->profileDeleteShader = impl_GLSL_DeleteShader;
         ctx->profileDeleteProgram = impl_GLSL_DeleteProgram;
-        ctx->profileGetAttribLocation = impl_GLSL_GetAttribLocation;
-        ctx->profileGetUniformLocation = impl_GLSL_GetUniformLocation;
+        ctx->profileGetAttribLocation = impl_SPIRV_GetAttribLocation;
+        ctx->profileGetUniformLocation = impl_SPIRV_GetUniformLocation;
         ctx->profileGetSamplerLocation = impl_GLSL_GetSamplerLocation;
         ctx->profileLinkProgram = impl_GLSL_LinkProgram;
         ctx->profileFinalInitProgram = impl_GLSL_FinalInitProgram;
@@ -2663,11 +2690,11 @@ void MOJOSHADER_glDestroyContext(MOJOSHADER_glContext *_ctx)
 } // MOJOSHADER_glDestroyContext
 
 
-#ifdef MOJOSHADER_FLIP_RENDERTARGET
 
 
 void MOJOSHADER_glProgramViewportFlip(int flip)
 {
+#ifdef MOJOSHADER_FLIP_RENDERTARGET
     assert(ctx->bound_program->vs_flip_loc != -1);
 
     /* Some compilers require that vpFlip be a float value, rather than int.
@@ -2680,10 +2707,10 @@ void MOJOSHADER_glProgramViewportFlip(int flip)
         ctx->glUniform1f(ctx->bound_program->vs_flip_loc, (float) flip);
         ctx->bound_program->current_flip = flip;
     } // if
+#endif
 }
 
 
-#endif
 
 
 #ifdef MOJOSHADER_EFFECT_SUPPORT

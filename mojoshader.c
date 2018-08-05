@@ -9162,8 +9162,8 @@ static uint32 spv_getimagecube(Context *ctx)
         return ctx->spirv.types.id ## _var = id; \
     }
 
-SPV_MAKE_GETPTR(ptrvec4u, vec4, Uniform);
-SPV_MAKE_GETPTR(ptrivec4u, ivec4, Uniform);
+SPV_MAKE_GETPTR(ptrvec4u, vec4, UniformConstant);
+SPV_MAKE_GETPTR(ptrivec4u, ivec4, UniformConstant);
 SPV_MAKE_GETPTR(ptrvec4i, vec4, Input);
 SPV_MAKE_GETPTR(ptrivec4i, ivec4, Input);
 SPV_MAKE_GETPTR(ptrvec4o, vec4, Output);
@@ -9174,9 +9174,9 @@ SPV_MAKE_GETPTR(ptrbvec4p, bvec4, Private);
 
 SPV_MAKE_GETPTR(ptrfloato, float, Output);
 
-SPV_MAKE_GETPTR(ptrimage2d, image2d, Uniform);
-SPV_MAKE_GETPTR(ptrimage3d, image3d, Uniform);
-SPV_MAKE_GETPTR(ptrimagecube, imagecube, Uniform);
+SPV_MAKE_GETPTR(ptrimage2d, image2d, UniformConstant);
+SPV_MAKE_GETPTR(ptrimage3d, image3d, UniformConstant);
+SPV_MAKE_GETPTR(ptrimagecube, imagecube, UniformConstant);
 
 #undef SPV_MAKE_GETPTR
 
@@ -9874,6 +9874,7 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
                                const VariableList *var)
 {
     RegisterList *r = reglist_find(&ctx->uniforms, regtype, regnum);
+    unsigned offset = 16; // offset by 16 to handle samplers taking uniform locations on spir-v
 
     // TODO: If the SSA id for this register is still 0 by this point, that means no instructions actually
     // loaded from/stored to this variable...
@@ -9887,19 +9888,25 @@ static void emit_SPIRV_uniform(Context *ctx, RegisterType regtype, int regnum,
     {
         switch (regtype)
         {
-            case REG_TYPE_CONST:
-            case REG_TYPE_CONSTINT:
-            case REG_TYPE_CONSTBOOL:
+            case REG_TYPE_CONST: // mapped as [48, inf]
+                offset += 16; // fallthrough
+            case REG_TYPE_CONSTBOOL: // mapped as [32, 48)
+                offset += 16; // fallthrough
+            case REG_TYPE_CONSTINT: // mapped as [16, 32)
             {
                 push_output(ctx, &ctx->mainline_intro);
                 uint32 tid = spv_getptrvec4u(ctx);
                 output_spvop(ctx, SpvOpVariable, 4);
                 output_id(ctx, tid);
                 output_id(ctx, r->spirv.iddecl);
-                output_u32(ctx, SpvStorageClassUniform);
+                output_u32(ctx, SpvStorageClassUniformConstant);
                 pop_output(ctx);
 
                 output_spv_regname(ctx, r->spirv.iddecl, regtype, regnum);
+                // hnn: generate location decorator for uniforms
+                // add +16 because GLSL (and SPIR-V) uses samplers as uniforms
+                // !! FIXME: VS and PS samplers seem to be shared, confirm later.
+                output_spvlocation(ctx, r->spirv.iddecl, regnum + offset);
                 break;
             }
 
@@ -9935,7 +9942,7 @@ static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype, int t
     output_spvop(ctx, SpvOpVariable, 4);
     output_id(ctx, type);
     output_id(ctx, result);
-    output_u32(ctx, SpvStorageClassUniform);
+    output_u32(ctx, SpvStorageClassUniformConstant);
     if (texbem)  // This sampler used a ps_1_1 TEXBEM opcode?
     {
         fail(ctx, "texbem not implemented");
@@ -9947,6 +9954,9 @@ static void emit_SPIRV_sampler(Context *ctx, int stage, TextureType ttype, int t
 //        output_line(ctx, "#define %s_texbeml %s[%d]", var, name, index+1);
     } // if
     pop_output(ctx);
+
+    // hnn: specify uniform location for SPIR-V shaders (required per gl_arb_spirv spec)
+    output_spvlocation(ctx, result, sampler_reg->index);
 
     output_spv_regname(ctx, result, REG_TYPE_SAMPLER, stage);
 } // emit_SPIRV_sampler
@@ -10145,6 +10155,9 @@ static void emit_SPIRV_attribute(Context *ctx, RegisterType regtype, int regnum,
                 output_u32(ctx, r->spirv.iddecl);
                 output_u32(ctx, SpvStorageClassInput);
                 pop_output(ctx);
+
+                // hnn: generate location decorators for the input
+                output_spvlocation(ctx, r->spirv.iddecl, regnum);
                 break;
 
             case REG_TYPE_OUTPUT:
@@ -10318,6 +10331,7 @@ static void emit_SPIRV_finalize(Context *ctx)
 static void emit_SPIRV_NOP(Context *ctx)
 {
     // no-op is a no-op.  :)
+    // TODO: (hnn) SPIR-V has OpNop :O
 } // emit_SPIRV_NOP
 
 static void emit_SPIRV_DEF(Context *ctx)

@@ -8,8 +8,8 @@ set(TESTPARSE_SRC
 add_executable(${PROJECT_NAME} ${TESTPARSE_SRC})
 
 add_library(spirv-tools SHARED IMPORTED)
-set_property(TARGET spirv-tools PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/SPIRV-Tools-shared.dll)
-set_property(TARGET spirv-tools PROPERTY IMPORTED_IMPLIB ${CMAKE_CURRENT_SOURCE_DIR}/lib/SPIRV-Tools-shared.lib)
+set_property(TARGET spirv-tools PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/libSPIRV-Tools-shared.so)
+set_property(TARGET spirv-tools PROPERTY IMPORTED_IMPLIB ${CMAKE_CURRENT_SOURCE_DIR}/lib/libSPIRV-Tools-shared.so)
 
 # Implicitly adds mojoshader as a dependency
 target_link_libraries(${PROJECT_NAME}

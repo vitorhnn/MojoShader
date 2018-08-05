@@ -432,7 +432,7 @@ static void print_shader(const char *fname, const MOJOSHADER_parseData *pd,
                     output = text->str;
                     output_len = text->length;
 
-                    snprintf(filename, sizeof(filename), "%s.%s.spvdis", pd->mainfn, shader_type);
+                    snprintf(filename, sizeof(filename), "%s.%s.spvasm", pd->mainfn, shader_type);
                     FILE* fdis = fopen(filename, "wt");
                     fwrite(output, 1, output_len, fdis);
                     fclose(fdis);
